@@ -78,18 +78,18 @@ When prompted that the directory is not empty, allow it to proceed (it will not 
 
 - [ ] **Step 2: Verify the dev server boots**
 
-Run: `cd klaus-fieldlog && npm run dev`
+Run: `npm run dev` (from `klapp/`)
 Expected: server starts on http://localhost:3000 with no errors. Stop it with Ctrl-C.
 
-- [ ] **Step 3: Add `.env.example` and ensure `.env` is git-ignored**
+- [ ] **Step 3: Confirm `.env.example` and `.gitignore`**
 
-Create `klaus-fieldlog/.env.example`:
+`klapp/.env.example` and `klapp/.gitignore` already exist (created during git setup); `.env*` is already ignored. `.env.example` should read:
 ```
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/klaus_fieldlog?schema=public"
-DATABASE_URL_TEST="postgresql://USER:PASSWORD@localhost:5432/klaus_fieldlog_test?schema=public"
-AUTH_SECRET="generate-with: npx auth secret"
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/klapp?schema=public"
+DATABASE_URL_TEST="postgresql://USER:PASSWORD@localhost:5432/klapp_test?schema=public"
+AUTH_SECRET=""  # generate with: npx auth secret
 ```
-Confirm `.gitignore` (created by create-next-app) contains `.env*`. If not, append `.env` and `.env.local`.
+Do NOT let `create-next-app` overwrite the existing `.gitignore`; if it appended its own, ensure `.env` is still excluded (the repo is public).
 
 - [ ] **Step 4: Commit** *(skip per user git preference)*
 
@@ -107,7 +107,7 @@ git add -A && git commit -m "chore: scaffold next.js app"
 
 - [ ] **Step 1: Install runtime + dev dependencies**
 
-Run in `klaus-fieldlog/`:
+Run in `klapp/`:
 ```bash
 npm install prisma @prisma/client next-auth@beta bcryptjs zod
 npm install -D vitest @vitejs/plugin-react tsx @types/bcryptjs \

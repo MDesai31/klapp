@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,92 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Role {
+  EMPLOYEE
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(EMPLOYEE)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdJobLogs JobLog[]        @relation("CreatedBy")
+  workedJobs     JobLogWorker[]
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobLogs   JobLog[]
+}
+
+model JobType {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobLogs   JobLogJobType[]
+}
+
+model Material {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobLogs   JobLogMaterial[]
+}
+
+model JobLog {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  date        DateTime @db.Date
+  timeArrived DateTime
+  timeLeft    DateTime
+  notes       String?
+  createdById String
+  createdBy   User     @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workers   JobLogWorker[]
+  jobTypes  JobLogJobType[]
+  materials JobLogMaterial[]
+}
+
+model JobLogWorker {
+  jobLogId String
+  jobLog   JobLog @relation(fields: [jobLogId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  @@id([jobLogId, userId])
+}
+
+model JobLogJobType {
+  jobLogId  String
+  jobLog    JobLog  @relation(fields: [jobLogId], references: [id], onDelete: Cascade)
+  jobTypeId String
+  jobType   JobType @relation(fields: [jobTypeId], references: [id])
+  @@id([jobLogId, jobTypeId])
+}
+
+model JobLogMaterial {
+  jobLogId   String
+  jobLog     JobLog   @relation(fields: [jobLogId], references: [id], onDelete: Cascade)
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  @@id([jobLogId, materialId])
 }

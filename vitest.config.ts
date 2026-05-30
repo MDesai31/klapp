@@ -8,7 +8,6 @@ export default defineConfig({
     setupFiles: ["tests/setup.ts"],
     sequence: { concurrent: false },
     maxWorkers: 1,
-    minWorkers: 1,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },

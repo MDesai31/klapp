@@ -1,0 +1,39 @@
+# Secrets / environment — NEVER commit (public repo)
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+
+# Prisma
+# (schema & migrations ARE committed; local db files are not)
+*.db
+*.sqlite
+
+# Testing
+/coverage
+/playwright-report/
+/test-results/
+/blob-report/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp

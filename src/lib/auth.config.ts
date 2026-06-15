@@ -1,8 +1,19 @@
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig: NextAuthConfig = {
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 10 * 60 },
   pages: { signIn: "/login" },
+  cookies: {
+    sessionToken: {
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        // No maxAge → session cookie, deleted when browser closes
+      },
+    },
+  },
   providers: [],
   callbacks: {
     jwt: ({ token, user }) => {

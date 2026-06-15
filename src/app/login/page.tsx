@@ -1,4 +1,6 @@
 import { signIn } from "@/lib/auth";
+import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 
 export default async function LoginPage({
   searchParams,
@@ -13,11 +15,18 @@ export default async function LoginPage({
       <form
         action={async (formData: FormData) => {
           "use server";
-          await signIn("credentials", {
-            email: formData.get("email"),
-            password: formData.get("password"),
-            redirectTo: "/jobs",
-          });
+          try {
+            await signIn("credentials", {
+              email: formData.get("email"),
+              password: formData.get("password"),
+              redirectTo: "/jobs",
+            });
+          } catch (error) {
+            if (error instanceof AuthError) {
+              redirect("/login?error=CredentialsSignin");
+            }
+            throw error;
+          }
         }}
         style={{ display: "flex", flexDirection: "column", gap: 10 }}
       >

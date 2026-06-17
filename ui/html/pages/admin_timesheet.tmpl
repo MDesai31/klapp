@@ -1,0 +1,31 @@
+{{define "title"}}Timesheet{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>Timesheet</h1>
+<p>Pay period starting {{.CurrentPeriod}}. Other periods:
+{{range .PayPeriods}}<a href="/admin/timesheet?period={{.}}">{{.}}</a> {{end}}
+</p>
+
+<table>
+<tr>
+    <th>Worker</th><th>Day</th><th>In</th><th>Out</th><th>Late</th><th>Edited</th><th>Location</th><th></th>
+</tr>
+{{range .TimesheetRows}}
+<tr{{if .Late}} class="late"{{end}}>
+    <td>{{.WorkerName}}</td>
+    <td>{{.Day}}</td>
+    <td>{{.StartTime.Local.Format "3:04 PM"}}</td>
+    <td>{{.EndTimeDisplay}}</td>
+    <td>{{if .Late}}yes{{end}}</td>
+    <td>{{if .ModifiedByAdmin}}yes{{end}}</td>
+    <td>
+        <a href="{{printf "https://www.google.com/maps?q=%v,%v" .StartLat .StartLon}}" target="_blank">in</a>
+        {{if .EndLat.Valid}} / <a href="{{printf "https://www.google.com/maps?q=%v,%v" .EndLat.Float64 .EndLon.Float64}}" target="_blank">out</a>{{end}}
+    </td>
+    <td><a href="/admin/punches/{{.ID}}/edit">edit</a></td>
+</tr>
+{{end}}
+</table>
+{{end}}

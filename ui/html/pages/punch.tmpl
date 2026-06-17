@@ -1,0 +1,56 @@
+{{define "title"}}Punch{{end}}
+
+{{define "main"}}
+<div class="center">
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
+{{if not .Worker}}
+<form action="/punch" method="POST">
+    <label for="pin">Enter your PIN</label>
+    <input type="password" inputmode="numeric" id="pin" name="pin" autofocus required>
+    <button type="submit">Continue</button>
+</form>
+
+{{else}}
+<h1>Hello {{.Worker.WorkerName}}</h1>
+
+{{if .OpenPunch}}
+<p>Punched in at {{.OpenPunch.StartTime.Local.Format "3:04 PM"}}</p>
+<form id="punch-form" action="/punch/out" method="POST">
+    <input type="hidden" name="pin" value="{{.PIN}}">
+    <input type="hidden" name="lat">
+    <input type="hidden" name="lon">
+    <button type="submit" class="btn btn-out">Punch Out</button>
+</form>
+{{else}}
+<form id="punch-form" action="/punch/in" method="POST">
+    <input type="hidden" name="pin" value="{{.PIN}}">
+    <input type="hidden" name="lat">
+    <input type="hidden" name="lon">
+    <button type="submit" class="btn btn-in">Punch In</button>
+</form>
+{{end}}
+{{end}}
+</div>
+
+<script>
+(function () {
+    var form = document.getElementById("punch-form");
+    if (!form) return;
+
+    var button = form.querySelector("button");
+    button.disabled = true;
+    button.textContent = "Getting location...";
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+        form.lat.value = pos.coords.latitude;
+        form.lon.value = pos.coords.longitude;
+        button.disabled = false;
+        button.textContent = form.action.endsWith("/out") ? "Punch Out" : "Punch In";
+    }, function () {
+        button.disabled = false;
+        button.textContent = "Location unavailable - try again";
+    });
+})();
+</script>
+{{end}}

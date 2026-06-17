@@ -1,0 +1,38 @@
+{{define "title"}}Workers{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
+<h1>Workers</h1>
+<table>
+<tr><th>Name</th><th>Phone</th><th>Active</th><th></th></tr>
+{{range .Workers}}
+<tr>
+    <td>{{.WorkerName}}</td>
+    <td>{{.Phone}}</td>
+    <td>{{if .Active}}yes{{else}}no{{end}}</td>
+    <td>
+        <form action="/admin/workers/{{.ID}}/toggle-active" method="POST" class="inline">
+            <button type="submit">{{if .Active}}Deactivate{{else}}Reactivate{{end}}</button>
+        </form>
+    </td>
+</tr>
+{{end}}
+</table>
+
+<h2>Add worker</h2>
+<form action="/admin/workers" method="POST">
+    <label for="worker_name">Name</label>
+    <input type="text" id="worker_name" name="worker_name" required>
+
+    <label for="pin">PIN</label>
+    <input type="text" inputmode="numeric" id="pin" name="pin" required>
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone">
+
+    <button type="submit">Add</button>
+</form>
+{{end}}

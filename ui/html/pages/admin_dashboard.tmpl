@@ -1,0 +1,16 @@
+{{define "title"}}Dashboard{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>Today</h1>
+<table>
+<tr><th>Worker</th><th>Status</th></tr>
+{{range .DashboardRows}}
+<tr{{if not .StartTime.Valid}} class="not-in"{{end}}>
+    <td>{{.WorkerName}}</td>
+    <td>{{.StatusLabel}}</td>
+</tr>
+{{end}}
+</table>
+{{end}}

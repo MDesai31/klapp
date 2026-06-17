@@ -1,0 +1,88 @@
+body {
+    font-family: system-ui, sans-serif;
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.center {
+    max-width: 480px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+label {
+    display: block;
+    margin-top: 1rem;
+    font-weight: bold;
+}
+
+input, button {
+    font-size: 1.25rem;
+    padding: 0.75rem;
+    width: 100%;
+    margin: 0.5rem 0;
+    box-sizing: border-box;
+}
+
+.btn {
+    border: none;
+    color: white;
+    font-weight: bold;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    font-size: 1.5rem;
+}
+
+.btn-in {
+    background-color: #1a7f37;
+}
+
+.btn-out {
+    background-color: #c0342c;
+}
+
+.flash {
+    background: #fff3cd;
+    border: 1px solid #ffe69c;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+}
+
+nav {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+nav form.inline {
+    margin-left: auto;
+}
+
+form.inline, form.inline button {
+    width: auto;
+    margin: 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid #ddd;
+}
+
+tr.late {
+    background: #fff3cd;
+}
+
+tr.not-in {
+    color: #999;
+}

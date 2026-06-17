@@ -1,0 +1,14 @@
+[Unit]
+Description=Klaus Field Log
+After=network.target
+
+[Service]
+Type=simple
+User=tklaus
+WorkingDirectory=/home/tklaus/klapp
+ExecStart=/home/tklaus/klapp/web
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

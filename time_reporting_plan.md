@@ -92,7 +92,7 @@ Workers can keep doing what they are doing with the physical paper.
   - Can view and edit the current pay period hours.
 
 - Backend:
-  - Websites will be hosted with Go programming language. For external access maybe Nginx should be alongside it, or whatever is recommended.
+  - Websites will be hosted with Go programming language. For external access, Caddy sits in front as the reverse proxy (automatic HTTPS).
   - There will be a SQLite database with tables:
     - **worker**: To keep worker\_name, pin
     - **time\_reporting**: Columns: employee\_name, pay\_period (start date of the pay period), day, start\_time, end\_time, start\_lat, start\_lon, end\_lat, end\_lon, late (boolean with true if was entered late), modified\_by\_admin (boolean for true if this entry was modified by admin)

@@ -1,40 +1,68 @@
 # Klaus Field Log
 
-Internal field-operations tool: employees log jobs and view their hours; admins
-view all jobs/hours and manage customers, employees, job types, and materials.
+Internal field-operations tool for a landscaping company: workers punch in/out
+from a phone, admins review and correct time entries over LAN/WireGuard.
 
-## Stack
+Go + SQLite, no external services. See `refactor.md` for the stack rationale
+and `time_reporting_plan.md` for the feature design.
 
-Next.js (App Router) + TypeScript, Prisma 6 + PostgreSQL, Auth.js v5, Zod, Vitest, Playwright.
+## Quick Start
 
-## Setup
-
-1. `npm install`
-2. Copy `.env.example` to `.env` and fill `DATABASE_URL`, `DATABASE_URL_TEST`, `AUTH_SECRET`
-   - Generate AUTH_SECRET: `npx auth secret`
-3. Start PostgreSQL (Docker): `docker run -d --name klapp-postgres -e POSTGRES_USER=klapp -e POSTGRES_PASSWORD=klapp -e POSTGRES_DB=klapp -p 5432:5432 postgres:16-alpine`
-4. Create test DB: `docker exec klapp-postgres psql -U klapp -c "CREATE DATABASE klapp_test;"`
-5. `npx prisma migrate dev` — apply schema
-6. `npm run db:seed` — seed admin/employees/lookups
-7. `npm run dev` — http://localhost:3000
-
-## Seed logins
-
-| Role     | Email                  | Password      |
-|----------|------------------------|---------------|
-| Admin    | admin@klaus.test       | admin12345    |
-| Employee | manthan@klaus.test     | employee12345 |
-| Employee | thomas@klaus.test      | employee12345 |
-
-## Tests
-
-```bash
-npm test            # unit + integration (needs DATABASE_URL_TEST in .env)
-npm run test:e2e    # Playwright smoke tests (needs seeded dev DB)
+Automated tests:
+```
+go test ./...
 ```
 
-## Roadmap (post-MVP)
+To try it for real:
 
-- Pricing + customer invoices
-- QuickBooks integration
-- Offline logging/sync
+1. Start the app (runs both servers + migrations):
+   ```
+   go run ./cmd/web
+   ```
+2. In another terminal, create your admin login:
+   ```
+   go run ./cmd/seedadmin -username owner -password <pick-something>
+   ```
+3. Go to http://localhost:8082/admin/login and log in.
+4. On the **Workers** tab, add a worker with a PIN (e.g. name "Test", PIN "1234").
+5. Go to http://localhost:4000/punch, enter that PIN, hit **Punch In** (your
+   browser will ask for location permission — allow it).
+6. Back on the admin site, check `/admin` (dashboard) — should show "In since ...".
+7. Punch out from the worker page, then check `/admin/timesheet` — should show
+   the full entry with a map link for the location.
+8. Try `/admin/punches/{id}/edit` (linked from the timesheet) to correct a time
+   and confirm the "Edited" column flips to yes.
+9. Try http://localhost:4000/punch/late for the late-punch-out flow.
+
+The dev DB is `db/klapp.db` — delete it (plus the `-shm`/`-wal` files) anytime
+to start fresh.
+
+## Run it
+
+```
+go run ./cmd/web
+```
+
+- Worker punch site: http://localhost:4000/punch
+- Admin site: http://localhost:8082/admin (bound to all interfaces — reachable
+  over LAN and WireGuard, not just localhost)
+
+SQLite migrations run automatically on startup. The database file
+(`db/klapp.db`) is created on first run and is gitignored.
+
+### First admin login
+
+There's no signup page — bootstrap the first admin from the command line:
+
+```
+go run ./cmd/seedadmin -username admin -password <something>
+```
+
+## Test
+
+```
+go test ./...
+```
+
+Each test gets its own throwaway SQLite file with migrations applied fresh,
+so tests run independently and in parallel — no shared test database to set up.

@@ -1,0 +1,16 @@
+{{define "title"}}Edit Punch{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>Edit punch for {{.Worker.WorkerName}}</h1>
+<form action="/admin/punches/{{.Punch.ID}}/edit" method="POST">
+    <label for="start_time">Start</label>
+    <input type="datetime-local" id="start_time" name="start_time" value="{{.Punch.StartTimeInputValue}}" required>
+
+    <label for="end_time">End (leave blank if still punched in)</label>
+    <input type="datetime-local" id="end_time" name="end_time" value="{{.Punch.EndTimeInputValue}}">
+
+    <button type="submit">Save</button>
+</form>
+{{end}}

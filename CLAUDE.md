@@ -1,36 +1,24 @@
-@AGENTS.md
-
 ## Project
-Klaus Field Log — Next.js 16.2.6 (App Router) + Prisma 6 + Auth.js v5 beta + PostgreSQL (Docker).
+Klaus Field Log — Go + SQLite. Two binaries: the public worker punch site and the
+LAN/WireGuard-only admin site. See `refactor.md` and `time_reporting_plan.md` for
+the design.
 
-## Database
-- Postgres runs in Docker: `docker start klapp-postgres` (or see README to create it fresh)
-- Dev DB: `postgresql://klapp:klapp@localhost:5432/klapp`
-- Test DB: `postgresql://klapp:klapp@localhost:5432/klapp_test`
-- Apply migrations: `npx prisma migrate dev`
-- Seed: `npm run db:seed`
-- Apply to test DB: `DATABASE_URL="postgresql://klapp:klapp@localhost:5432/klapp_test?schema=public" npx prisma migrate deploy`
+## Running
+- Worker site: `go run ./cmd/web` (default `:4000`)
+- Admin site: started by the same binary on a second port (default `:8082`,
+  flag `-admin-addr`), bound to all interfaces so it's reachable over LAN and WireGuard
+- Bootstrap the first admin login: `go run ./cmd/seedadmin -username <name> -password <pw>`
+- DB migrations (goose, embedded) run automatically on startup against `db/klapp.db`
+  (gitignored, created on first run)
 
-## Prisma 6 — breaking changes from training data
-- Import client from `@/generated/prisma/client` (NOT `@prisma/client`)
-- Generator: `provider = "prisma-client"`, output `"../src/generated/prisma"`
-- `PrismaClient` requires a driver adapter — no `datasourceUrl` option:
-  `new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) })`
-- Install: `@prisma/adapter-pg` + `pg`
-- Datasource URL lives in `prisma.config.ts`, not in `schema.prisma`
-- Seed scripts: use relative import `../src/generated/prisma/client` + `import "dotenv/config"`
-
-## Next.js 16 — breaking changes from training data
-- `searchParams` in page components is `Promise<{...}>` — always `await searchParams`
-- Read `node_modules/next/dist/docs/` before writing page/layout code
-
-## Auth.js v5 beta (next-auth@5.0.0-beta.31)
-- `next-auth/middleware` is deleted — use `auth` from `@/lib/auth` to wrap middleware
-- `npx auth secret` pulls the wrong package — set `AUTH_SECRET` in `.env` manually
-- `signIn`/`signOut`/`auth` all import from `@/lib/auth` in server components
+## Conventions
+- Project layout follows `~/go-utils/snippetbox` (app struct in `cmd/web/main.go`,
+  models in `internal/models/`, html/template pages in `ui/html/pages/`)
+- Dates/times are stored as ISO-8601 `TEXT` in SQLite (UTC instants, local-date
+  day/pay-period buckets) — see `internal/models/time_punches.go`
+- No ORM — raw SQL via `database/sql`
 
 ## Testing
-- Run: `npm test` (unit + integration, needs `.env` with `DATABASE_URL_TEST`)
-- Integration tests share test DB — `maxWorkers: 1` in vitest config prevents race conditions
-- `tests/setup.ts` loads `dotenv/config` so `.env` values are available in test workers
-- E2E (`npm run test:e2e`) requires Playwright — does NOT work on Ubuntu 26.04
+- `go test ./...` — model tests use a throwaway SQLite file per test (`t.TempDir()`),
+  migrations applied fresh each run. No shared test DB, no race conditions, tests
+  can run in parallel.

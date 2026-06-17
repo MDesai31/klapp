@@ -1,6 +1,4 @@
-# Rewrite Plan: Go + MySQL
-
-Full design notes live in `~/klaus_landscaping/klaus_landscapping/time_reporting/notes/`.
+# Rewrite Plan: Go + SQLite
 
 ---
 
@@ -19,7 +17,7 @@ Goals:
 ## Stack
 
 - **Go** (1.x compatibility guarantee — code written today compiles in 5 years)
-- **MySQL** (`database/sql` + `go-sql-driver/mysql`)
+- **SQLite** (`database/sql` + `modernc.org/sqlite` — pure Go, no cgo, keeps cross-compilation and the single-binary build simple)
 - **`html/template`** for server-rendered HTML
 - **`golang.org/x/crypto/bcrypt`** for PIN and password hashing
 - **`alexedwards/scs`** for admin session cookies (encrypted, no DB table)
@@ -51,6 +49,7 @@ klapp/
 │   ├── materials.go      # Phase 2
 │   └── job_logs.go       # Phase 2
 ├── db/
+│   ├── klapp.db           # SQLite database file (gitignored)
 │   └── migrations/       # goose SQL files (0001_init.sql, 0002_add_jobs.sql, etc.)
 ├── go.mod
 └── ui/
@@ -92,36 +91,38 @@ klapp/
 
 ## Database Schema
 
+SQLite has no enforced `VARCHAR(n)` length and no native `DECIMAL`/`DATETIME` types — columns below use SQLite's actual storage classes (`TEXT`, `INTEGER`, `REAL`). Dates/times are stored as ISO-8601 `TEXT` (sorts and compares correctly as a string). Two pragmas are set on every connection: `foreign_keys = ON` (off by default in SQLite) and `journal_mode = WAL` (lets reads proceed without blocking on the single writer).
+
 ### `workers`
 | Column | Type | Notes |
 |---|---|---|
-| id | INT PK AUTO_INCREMENT | |
-| worker_name | VARCHAR(100) | |
-| pin | VARCHAR(255) | bcrypt hash |
-| phone | VARCHAR(20) | for SMS |
+| id | INTEGER PK AUTOINCREMENT | |
+| worker_name | TEXT | |
+| pin | TEXT | bcrypt hash |
+| phone | TEXT | for SMS |
 | active | BOOLEAN DEFAULT TRUE | |
 
 ### `time_punches`
 | Column | Type | Notes |
 |---|---|---|
-| id | INT PK AUTO_INCREMENT | |
-| worker_id | INT FK → workers.id | |
-| pay_period | DATE | Start date of the bi-weekly pay period |
-| day | DATE | |
-| start_time | DATETIME | |
-| end_time | DATETIME NULL | null until punched out |
-| start_lat | DECIMAL(9,6) | |
-| start_lon | DECIMAL(9,6) | |
-| end_lat | DECIMAL(9,6) NULL | |
-| end_lon | DECIMAL(9,6) NULL | |
+| id | INTEGER PK AUTOINCREMENT | |
+| worker_id | INTEGER FK → workers.id | |
+| pay_period | TEXT | ISO-8601 date, start of the bi-weekly pay period |
+| day | TEXT | ISO-8601 date |
+| start_time | TEXT | ISO-8601 datetime |
+| end_time | TEXT NULL | null until punched out |
+| start_lat | REAL | |
+| start_lon | REAL | |
+| end_lat | REAL NULL | |
+| end_lon | REAL NULL | |
 | late | BOOLEAN DEFAULT FALSE | true if submitted via 9pm SMS link |
 | modified_by_admin | BOOLEAN DEFAULT FALSE | |
 
 ### `config`
 | Column | Type | Notes |
 |---|---|---|
-| key | VARCHAR(50) PK | |
-| value | VARCHAR(255) | |
+| key | TEXT PK | |
+| value | TEXT | |
 
 Config keys: `storage_lat`, `storage_lon`, `storage_radius_miles`
 
@@ -135,12 +136,14 @@ Job-related tables (Phase 2): `customers`, `job_types`, `materials`, `job_logs`,
 - **Admin site**: HTTP only, accessible over WireGuard VPN — no public exposure
 - **SMS**: Telit modem on the server, AT commands for 6pm reminders and 9pm notices
 - **Cron**: 6pm reminder and 9pm late-notice run as system cron jobs
+- **Database**: SQLite file on local disk, no separate server process — back up by copying the file (or stream continuously with `litestream` if off-box backup is wanted)
 
 ---
 
 ## Build Phases
 
 ### Phase 1 — Punch In / Out
+Full design at time_reporting_plan.md
 Worker site:
 - Enter PIN → identify worker, show punch status
 - Large green Punch In / red Punch Out button
@@ -188,7 +191,7 @@ Go's built-in `testing` package — no external framework needed. Test files liv
 
 ### Test database
 
-Integration tests run against a real MySQL test database (same approach as the current Next.js app). A `DATABASE_URL_TEST` env var points to a separate `klapp_test` database. Goose migrations apply to both.
+Each test run uses its own throwaway SQLite database — a temp file (`t.TempDir()`) or an in-memory DB (`file::memory:?cache=shared`). Goose migrations apply at the start of the run. No separate test server, no `DATABASE_URL_TEST`, no shared-state races — tests can run in parallel instead of needing `maxWorkers: 1` like the current Next.js setup.
 
 Reference: Let's Go chapter 13 (`~/go-utils/lets-go-professional-package.html/13.00-testing.html`) covers the full pattern including mocking, integration tests, and assertion helpers.
 
@@ -200,6 +203,7 @@ Reference: Let's Go chapter 13 (`~/go-utils/lets-go-professional-package.html/13
 - No password reset / forgot password flows
 - No cookies on the worker path
 - No ORM — raw SQL, easy to read and change
+- No separate database server to install, patch, or back up — SQLite is one file next to the binary
 - No npm, no bundler, no React, no RSC
 - No Auth.js beta edge cases
 - No CSRF (worker path has no cookies; admin is VPN-only)

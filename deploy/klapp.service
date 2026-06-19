@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=tklaus
-WorkingDirectory=/home/tklaus/klapp
-ExecStart=/home/tklaus/klapp/web
+WorkingDirectory=/opt/klapp
+ExecStart=/opt/klapp/web
 Restart=always
 RestartSec=5
 

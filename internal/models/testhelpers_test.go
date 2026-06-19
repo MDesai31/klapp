@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/pressly/goose/v3"
-	"golang.org/x/crypto/bcrypt"
 
 	gdb "klapp/db"
 
@@ -39,13 +38,8 @@ func newTestDB(t *testing.T) *sql.DB {
 func mustInsertWorker(t *testing.T, db *sql.DB, name, pin string, active bool) int {
 	t.Helper()
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(pin), bcrypt.MinCost)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	result, err := db.Exec(`INSERT INTO workers (worker_name, pin, phone, active) VALUES (?, ?, ?, ?)`,
-		name, hash, "555-0100", active)
+		name, pin, "555-0100", active)
 	if err != nil {
 		t.Fatal(err)
 	}

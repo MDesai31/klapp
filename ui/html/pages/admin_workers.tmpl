@@ -7,10 +7,11 @@
 
 <h1>Workers</h1>
 <table>
-<tr><th>Name</th><th>Phone</th><th>Active</th><th></th></tr>
+<tr><th>Name</th><th>PIN</th><th>Phone</th><th>Active</th><th></th></tr>
 {{range .Workers}}
 <tr>
     <td>{{.WorkerName}}</td>
+    <td>{{.PIN}}</td>
     <td>{{.Phone}}</td>
     <td>{{if .Active}}yes{{else}}no{{end}}</td>
     <td>

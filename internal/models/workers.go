@@ -3,13 +3,12 @@ package models
 import (
 	"database/sql"
 	"errors"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Worker struct {
 	ID         int
 	WorkerName string
+	PIN        string
 	Phone      string
 	Active     bool
 }
@@ -19,8 +18,11 @@ type WorkerModel struct {
 }
 
 // Authenticate identifies a worker by PIN alone (no separate username/ID
-// entry), so it checks the entered PIN against every active worker's
-// bcrypt hash until one matches. Fine at the expected scale (~15 workers).
+// entry), so it checks the entered PIN against every active worker's PIN
+// until one matches. PINs are stored in plaintext - they're short numeric
+// codes for clocking in, not account passwords, and admins need to be able
+// to look one up for a worker who forgot it. Fine at the expected scale
+// (~15 workers).
 func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
 	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone FROM workers WHERE active = TRUE`)
 	if err != nil {
@@ -30,11 +32,10 @@ func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
 
 	for rows.Next() {
 		var w Worker
-		var hash string
-		if err := rows.Scan(&w.ID, &w.WorkerName, &hash, &w.Phone); err != nil {
+		if err := rows.Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone); err != nil {
 			return Worker{}, err
 		}
-		if bcrypt.CompareHashAndPassword([]byte(hash), []byte(pin)) == nil {
+		if w.PIN == pin {
 			w.Active = true
 			return w, nil
 		}
@@ -47,10 +48,10 @@ func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
 }
 
 func (m *WorkerModel) Get(id int) (Worker, error) {
-	stmt := `SELECT id, worker_name, phone, active FROM workers WHERE id = ?`
+	stmt := `SELECT id, worker_name, pin, phone, active FROM workers WHERE id = ?`
 
 	var w Worker
-	err := m.DB.QueryRow(stmt, id).Scan(&w.ID, &w.WorkerName, &w.Phone, &w.Active)
+	err := m.DB.QueryRow(stmt, id).Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.Active)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Worker{}, ErrNoRecord
@@ -64,7 +65,7 @@ func (m *WorkerModel) Get(id int) (Worker, error) {
 // List returns every worker, active or not, for the admin worker
 // management page.
 func (m *WorkerModel) List() ([]Worker, error) {
-	rows, err := m.DB.Query(`SELECT id, worker_name, phone, active FROM workers ORDER BY worker_name`)
+	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone, active FROM workers ORDER BY worker_name`)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func (m *WorkerModel) List() ([]Worker, error) {
 	var out []Worker
 	for rows.Next() {
 		var w Worker
-		if err := rows.Scan(&w.ID, &w.WorkerName, &w.Phone, &w.Active); err != nil {
+		if err := rows.Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.Active); err != nil {
 			return nil, err
 		}
 		out = append(out, w)
@@ -83,13 +84,8 @@ func (m *WorkerModel) List() ([]Worker, error) {
 }
 
 func (m *WorkerModel) Create(name, pin, phone string) (int, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(pin), bcrypt.DefaultCost)
-	if err != nil {
-		return 0, err
-	}
-
 	stmt := `INSERT INTO workers (worker_name, pin, phone, active) VALUES (?, ?, ?, TRUE)`
-	result, err := m.DB.Exec(stmt, name, hash, phone)
+	result, err := m.DB.Exec(stmt, name, pin, phone)
 	if err != nil {
 		return 0, err
 	}

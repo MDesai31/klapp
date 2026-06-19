@@ -41,6 +41,8 @@ func (app *application) adminRoutes() http.Handler {
 	protected.HandleFunc("POST /admin/punches/{id}/edit", app.adminEditPunch)
 	protected.HandleFunc("GET /admin/workers", app.adminWorkers)
 	protected.HandleFunc("POST /admin/workers", app.adminCreateWorker)
+	protected.HandleFunc("GET /admin/workers/{id}/edit", app.adminEditWorkerForm)
+	protected.HandleFunc("POST /admin/workers/{id}/edit", app.adminEditWorker)
 	protected.HandleFunc("POST /admin/workers/{id}/toggle-active", app.adminToggleWorkerActive)
 	mux.Handle("/admin/", app.requireAdmin(protected))
 

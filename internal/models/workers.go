@@ -83,6 +83,25 @@ func (m *WorkerModel) List() ([]Worker, error) {
 	return out, rows.Err()
 }
 
+// Update changes a worker's name, PIN, and phone. Active status is changed
+// separately via SetActive.
+func (m *WorkerModel) Update(id int, name, pin, phone string) error {
+	result, err := m.DB.Exec(`UPDATE workers SET worker_name = ?, pin = ?, phone = ? WHERE id = ?`, name, pin, phone, id)
+	if err != nil {
+		return err
+	}
+
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNoRecord
+	}
+
+	return nil
+}
+
 func (m *WorkerModel) Create(name, pin, phone string) (int, error) {
 	stmt := `INSERT INTO workers (worker_name, pin, phone, active) VALUES (?, ?, ?, TRUE)`
 	result, err := m.DB.Exec(stmt, name, pin, phone)

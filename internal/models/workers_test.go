@@ -97,3 +97,30 @@ func TestWorkerCreateListAndSetActive(t *testing.T) {
 		t.Errorf("got error %v, want ErrNoRecord for unknown worker", err)
 	}
 }
+
+func TestWorkerUpdate(t *testing.T) {
+	db := newTestDB(t)
+	wm := &WorkerModel{DB: db}
+
+	id := mustInsertWorker(t, db, "Original Name", "1111", true)
+
+	if err := wm.Update(id, "New Name", "2222", "555-0100"); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	w, err := wm.Get(id)
+	if err != nil {
+		t.Fatalf("Get after Update: %v", err)
+	}
+	if w.WorkerName != "New Name" || w.PIN != "2222" || w.Phone != "555-0100" {
+		t.Errorf("got %+v, want updated name/pin/phone", w)
+	}
+
+	if _, err := wm.Authenticate("2222"); err != nil {
+		t.Errorf("updated PIN should authenticate, got error %v", err)
+	}
+
+	if err := wm.Update(id+999, "Nobody", "3333", ""); !errors.Is(err, ErrNoRecord) {
+		t.Errorf("got error %v, want ErrNoRecord for unknown worker", err)
+	}
+}

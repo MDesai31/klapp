@@ -15,6 +15,7 @@
     <td>{{.Phone}}</td>
     <td>{{if .Active}}yes{{else}}no{{end}}</td>
     <td>
+        <a href="/admin/workers/{{.ID}}/edit">Edit</a>
         <form action="/admin/workers/{{.ID}}/toggle-active" method="POST" class="inline">
             <button type="submit">{{if .Active}}Deactivate{{else}}Reactivate{{end}}</button>
         </form>

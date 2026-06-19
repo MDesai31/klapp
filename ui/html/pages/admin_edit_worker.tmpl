@@ -1,0 +1,19 @@
+{{define "title"}}Edit Worker{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>Edit worker</h1>
+<form action="/admin/workers/{{.Worker.ID}}/edit" method="POST">
+    <label for="worker_name">Name</label>
+    <input type="text" id="worker_name" name="worker_name" value="{{.Worker.WorkerName}}" required>
+
+    <label for="pin">PIN</label>
+    <input type="text" inputmode="numeric" id="pin" name="pin" value="{{.Worker.PIN}}" required>
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone" value="{{.Worker.Phone}}">
+
+    <button type="submit">Save</button>
+</form>
+{{end}}

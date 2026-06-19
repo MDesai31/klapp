@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=tklaus
 WorkingDirectory=/opt/klapp
-ExecStart=/opt/klapp/web
+ExecStart=/opt/klapp/web -addr=127.0.0.1:4000
 Restart=always
 RestartSec=5
 

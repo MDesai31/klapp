@@ -6,6 +6,11 @@
 {{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
 
 <h1>Workers</h1>
+{{if .ShowInactiveWorkers}}
+<p><a href="/admin/workers">Hide deactivated workers</a></p>
+{{else}}
+<p><a href="/admin/workers?show_inactive=1">Show deactivated workers</a></p>
+{{end}}
 <table>
 <tr><th>Name</th><th>PIN</th><th>Phone</th><th>Active</th><th></th></tr>
 {{range .Workers}}

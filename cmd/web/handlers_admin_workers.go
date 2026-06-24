@@ -9,13 +9,30 @@ import (
 )
 
 func (app *application) adminWorkers(w http.ResponseWriter, r *http.Request) {
+	showInactive := r.URL.Query().Has("show_inactive")
+
 	workers, err := app.workers.List()
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
+	if !showInactive {
+		workers = activeWorkers(workers)
+	}
 
-	app.render(w, r, http.StatusOK, "admin_workers.tmpl", templateData{Workers: workers})
+	app.render(w, r, http.StatusOK, "admin_workers.tmpl", templateData{Workers: workers, ShowInactiveWorkers: showInactive})
+}
+
+// activeWorkers filters a worker list down to active workers only, for the
+// default (deactivated workers hidden) view of the admin workers page.
+func activeWorkers(workers []models.Worker) []models.Worker {
+	out := make([]models.Worker, 0, len(workers))
+	for _, w := range workers {
+		if w.Active {
+			out = append(out, w)
+		}
+	}
+	return out
 }
 
 func (app *application) adminCreateWorker(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +53,7 @@ func (app *application) adminCreateWorker(w http.ResponseWriter, r *http.Request
 				return
 			}
 			app.render(w, r, http.StatusOK, "admin_workers.tmpl", templateData{
-				Workers: workers,
+				Workers: activeWorkers(workers),
 				Flash:   "That PIN is already in use by another worker.",
 			})
 			return

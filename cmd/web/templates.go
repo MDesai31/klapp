@@ -16,13 +16,14 @@ type templateData struct {
 	PIN       string // echoed into a hidden field so punch in/out can resend it
 
 	// admin site
-	Admin         *models.Admin
-	DashboardRows []models.DashboardRow
-	TimesheetRows []models.TimesheetRow
-	PayPeriods    []string
-	CurrentPeriod string
-	Workers       []models.Worker
-	Punch         *models.TimePunch
+	Admin               *models.Admin
+	DashboardRows       []models.DashboardRow
+	TimesheetRows       []models.TimesheetRow
+	PayPeriods          []string
+	CurrentPeriod       string
+	Workers             []models.Worker
+	ShowInactiveWorkers bool
+	Punch               *models.TimePunch
 
 	Flash string
 }

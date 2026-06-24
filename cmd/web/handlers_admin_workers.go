@@ -29,6 +29,18 @@ func (app *application) adminCreateWorker(w http.ResponseWriter, r *http.Request
 	}
 
 	if _, err := app.workers.Create(name, pin, phone); err != nil {
+		if errors.Is(err, models.ErrDuplicatePIN) {
+			workers, err := app.workers.List()
+			if err != nil {
+				app.serverError(w, r, err)
+				return
+			}
+			app.render(w, r, http.StatusOK, "admin_workers.tmpl", templateData{
+				Workers: workers,
+				Flash:   "That PIN is already in use by another worker.",
+			})
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}
@@ -75,6 +87,14 @@ func (app *application) adminEditWorker(w http.ResponseWriter, r *http.Request) 
 	if err := app.workers.Update(id, name, pin, phone); err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
 			app.clientError(w, http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, models.ErrDuplicatePIN) {
+			worker := models.Worker{ID: id, WorkerName: name, PIN: pin, Phone: phone}
+			app.render(w, r, http.StatusOK, "admin_edit_worker.tmpl", templateData{
+				Worker: &worker,
+				Flash:  "That PIN is already in use by another worker.",
+			})
 			return
 		}
 		app.serverError(w, r, err)

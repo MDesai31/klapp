@@ -3,6 +3,8 @@
 {{define "main"}}
 {{template "nav" .}}
 
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
 <h1>Edit worker</h1>
 <form action="/admin/workers/{{.Worker.ID}}/edit" method="POST">
     <label for="worker_name">Name</label>

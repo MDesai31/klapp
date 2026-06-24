@@ -84,8 +84,17 @@ func (m *WorkerModel) List() ([]Worker, error) {
 }
 
 // Update changes a worker's name, PIN, and phone. Active status is changed
-// separately via SetActive.
+// separately via SetActive. Returns ErrDuplicatePIN if another worker
+// (active or not) already has that PIN.
 func (m *WorkerModel) Update(id int, name, pin, phone string) error {
+	inUse, err := m.pinInUse(pin, id)
+	if err != nil {
+		return err
+	}
+	if inUse {
+		return ErrDuplicatePIN
+	}
+
 	result, err := m.DB.Exec(`UPDATE workers SET worker_name = ?, pin = ?, phone = ? WHERE id = ?`, name, pin, phone, id)
 	if err != nil {
 		return err
@@ -102,7 +111,17 @@ func (m *WorkerModel) Update(id int, name, pin, phone string) error {
 	return nil
 }
 
+// Create adds a new worker. Returns ErrDuplicatePIN if another worker
+// (active or not) already has that PIN.
 func (m *WorkerModel) Create(name, pin, phone string) (int, error) {
+	inUse, err := m.pinInUse(pin, 0)
+	if err != nil {
+		return 0, err
+	}
+	if inUse {
+		return 0, ErrDuplicatePIN
+	}
+
 	stmt := `INSERT INTO workers (worker_name, pin, phone, active) VALUES (?, ?, ?, TRUE)`
 	result, err := m.DB.Exec(stmt, name, pin, phone)
 	if err != nil {
@@ -115,6 +134,16 @@ func (m *WorkerModel) Create(name, pin, phone string) (int, error) {
 	}
 
 	return int(id), nil
+}
+
+// pinInUse reports whether some worker other than excludeID already has
+// pin. Pass 0 for excludeID when checking a new worker. PINs must be
+// unique across all workers, active or not, so a reactivated worker can't
+// collide with a PIN issued while it was inactive.
+func (m *WorkerModel) pinInUse(pin string, excludeID int) (bool, error) {
+	var exists bool
+	err := m.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM workers WHERE pin = ? AND id != ?)`, pin, excludeID).Scan(&exists)
+	return exists, err
 }
 
 // SetActive activates or deactivates a worker. There's no hard delete -

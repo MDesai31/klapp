@@ -124,3 +124,35 @@ func TestWorkerUpdate(t *testing.T) {
 		t.Errorf("got error %v, want ErrNoRecord for unknown worker", err)
 	}
 }
+
+func TestWorkerDuplicatePIN(t *testing.T) {
+	db := newTestDB(t)
+	wm := &WorkerModel{DB: db}
+
+	activeID := mustInsertWorker(t, db, "Active Worker", "1234", true)
+	inactiveID := mustInsertWorker(t, db, "Inactive Worker", "5678", false)
+
+	t.Run("Create rejects a PIN already used by an active worker", func(t *testing.T) {
+		if _, err := wm.Create("New Hire", "1234", ""); !errors.Is(err, ErrDuplicatePIN) {
+			t.Errorf("got error %v, want ErrDuplicatePIN", err)
+		}
+	})
+
+	t.Run("Create rejects a PIN already used by an inactive worker", func(t *testing.T) {
+		if _, err := wm.Create("New Hire", "5678", ""); !errors.Is(err, ErrDuplicatePIN) {
+			t.Errorf("got error %v, want ErrDuplicatePIN", err)
+		}
+	})
+
+	t.Run("Update rejects changing to another worker's PIN", func(t *testing.T) {
+		if err := wm.Update(inactiveID, "Inactive Worker", "1234", ""); !errors.Is(err, ErrDuplicatePIN) {
+			t.Errorf("got error %v, want ErrDuplicatePIN", err)
+		}
+	})
+
+	t.Run("Update allows a worker to keep its own PIN", func(t *testing.T) {
+		if err := wm.Update(activeID, "Active Worker", "1234", "555-0101"); err != nil {
+			t.Errorf("unexpected error keeping own PIN: %v", err)
+		}
+	})
+}

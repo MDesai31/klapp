@@ -7,4 +7,5 @@ var (
 	ErrInvalidPIN         = errors.New("models: invalid PIN")
 	ErrAlreadyOpen        = errors.New("models: worker already has an open punch")
 	ErrInvalidCredentials = errors.New("models: invalid username or password")
+	ErrDuplicatePIN       = errors.New("models: PIN already in use by another worker")
 )

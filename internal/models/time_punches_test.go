@@ -265,3 +265,117 @@ func TestAdminUpdate(t *testing.T) {
 		t.Errorf("got error %v, want ErrNoRecord for unknown punch", err)
 	}
 }
+
+func TestPayPeriodDays(t *testing.T) {
+	days, err := PayPeriodDays("2026-06-08")
+	if err != nil {
+		t.Fatalf("PayPeriodDays: %v", err)
+	}
+	if len(days) != 14 {
+		t.Fatalf("got %d days, want 14", len(days))
+	}
+	if days[0] != "2026-06-08" || days[13] != "2026-06-21" {
+		t.Errorf("got first/last day %q/%q, want 2026-06-08/2026-06-21", days[0], days[13])
+	}
+}
+
+func TestDayLabel(t *testing.T) {
+	got := DayLabel("2026-06-08")
+	want := time.Date(2026, 6, 8, 0, 0, 0, 0, time.Local).Format("Mon 1/2")
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestPayPeriodSummary(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+
+	period := payPeriodAnchor.Format("2006-01-02")
+	day1 := payPeriodAnchor.Add(8 * time.Hour)
+	day2 := payPeriodAnchor.AddDate(0, 0, 1).Add(8 * time.Hour)
+
+	alice := mustInsertWorker(t, db, "Alice", "1111", true)
+	mustInsertWorker(t, db, "Zane", "2222", true)
+	bob := mustInsertWorker(t, db, "Bob", "3333", false)
+	mustInsertWorker(t, db, "Yolanda", "4444", false) // inactive, no punches - excluded
+
+	// Alice: two punches on day1 (in/out twice, 1h + 1h), one punch on day2 (1h).
+	id1, err := tm.PunchIn(alice, 0, 0, day1)
+	if err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+	if err := tm.PunchOut(alice, 0, 0, day1.Add(time.Hour)); err != nil {
+		t.Fatalf("PunchOut: %v", err)
+	}
+	id2, err := tm.PunchIn(alice, 0, 0, day1.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+	if err := tm.PunchOut(alice, 0, 0, day1.Add(3*time.Hour)); err != nil {
+		t.Fatalf("PunchOut: %v", err)
+	}
+	if _, err := tm.PunchIn(alice, 0, 0, day2); err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+	if err := tm.PunchOut(alice, 0, 0, day2.Add(time.Hour)); err != nil {
+		t.Fatalf("PunchOut: %v", err)
+	}
+
+	// Bob (inactive): one punch on day1 (5h) - still included since it's in this period.
+	if _, err := tm.PunchIn(bob, 0, 0, day1); err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+	if err := tm.PunchOut(bob, 0, 0, day1.Add(5*time.Hour)); err != nil {
+		t.Fatalf("PunchOut: %v", err)
+	}
+
+	rows, err := tm.PayPeriodSummary(period)
+	if err != nil {
+		t.Fatalf("PayPeriodSummary: %v", err)
+	}
+
+	wantNames := []string{"Alice", "Bob", "Zane"}
+	if len(rows) != len(wantNames) {
+		t.Fatalf("got %d worker rows, want %d (%v)", len(rows), len(wantNames), rows)
+	}
+	byName := make(map[string]PayPeriodSummaryRow, len(rows))
+	for i, r := range rows {
+		byName[r.WorkerName] = r
+		if r.WorkerName != wantNames[i] {
+			t.Errorf("got worker order %d = %q, want %q (alphabetical)", i, r.WorkerName, wantNames[i])
+		}
+	}
+
+	aliceRow := byName["Alice"]
+	if got, want := aliceRow.Days[0].Worked, 2*time.Hour; got != want {
+		t.Errorf("Alice day0 worked = %v, want %v", got, want)
+	}
+	if got, want := aliceRow.Days[0].PunchIDs, []int{id1, id2}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("Alice day0 punch IDs = %v, want %v", got, want)
+	}
+	if got, want := aliceRow.Days[1].Worked, time.Hour; got != want {
+		t.Errorf("Alice day1 worked = %v, want %v", got, want)
+	}
+	if got, want := aliceRow.Total, 3*time.Hour; got != want {
+		t.Errorf("Alice total = %v, want %v", got, want)
+	}
+	if got := aliceRow.Days[2].Display(); got != "-" {
+		t.Errorf("Alice day2 (no punch) = %q, want %q", got, "-")
+	}
+
+	bobRow := byName["Bob"]
+	if got, want := bobRow.Total, 5*time.Hour; got != want {
+		t.Errorf("Bob total = %v, want %v", got, want)
+	}
+
+	zaneRow := byName["Zane"]
+	if got := zaneRow.TotalDisplay(); got != "-" {
+		t.Errorf("Zane (no punches) total = %q, want %q", got, "-")
+	}
+	for i, d := range zaneRow.Days {
+		if got := d.Display(); got != "-" {
+			t.Errorf("Zane day %d = %q, want %q", i, got, "-")
+		}
+	}
+}

@@ -122,6 +122,31 @@ func CurrentPayPeriod(t time.Time) string {
 	return payPeriodStart(t).Format("2006-01-02")
 }
 
+// PayPeriodDays returns the 14 day strings ("2006-01-02") that make up the
+// pay period starting at payPeriod, for the admin summary tab's columns.
+func PayPeriodDays(payPeriod string) ([]string, error) {
+	start, err := time.ParseInLocation("2006-01-02", payPeriod, time.Local)
+	if err != nil {
+		return nil, err
+	}
+
+	days := make([]string, 14)
+	for i := range days {
+		days[i] = start.AddDate(0, 0, i).Format("2006-01-02")
+	}
+	return days, nil
+}
+
+// DayLabel formats a "2006-01-02" date as a short column header, e.g.
+// "Mon 6/8".
+func DayLabel(date string) string {
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
+	if err != nil {
+		return date
+	}
+	return t.Format("Mon 1/2")
+}
+
 type scanner interface {
 	Scan(dest ...any) error
 }
@@ -353,4 +378,124 @@ func (m *TimePunchModel) PayPeriods() ([]string, error) {
 	}
 
 	return out, rows.Err()
+}
+
+// PayPeriodSummaryRow is one worker's total worked time per day of a pay
+// period, for the admin summary tab.
+type PayPeriodSummaryRow struct {
+	WorkerID   int
+	WorkerName string
+	Days       []DaySummary // one per day of the pay period, in order
+	Total      time.Duration
+}
+
+// TotalDisplay renders the row's pay-period total, or "-" if the worker
+// has no punches in the period at all.
+func (r PayPeriodSummaryRow) TotalDisplay() string {
+	if r.Total == 0 {
+		return "-"
+	}
+	return formatDuration(r.Total)
+}
+
+// DaySummary is a worker's worked time on a single day within a pay
+// period summary. PunchIDs is usually one punch, but can hold more than
+// one if the worker punched in and out twice in a day.
+type DaySummary struct {
+	Date     string
+	Worked   time.Duration
+	PunchIDs []int
+}
+
+// Display renders the day's worked time for the summary grid, or "-" if
+// the worker didn't punch in that day.
+func (d DaySummary) Display() string {
+	if len(d.PunchIDs) == 0 {
+		return "-"
+	}
+	return formatDuration(d.Worked)
+}
+
+// PayPeriodSummary builds the admin summary tab's grid: every active
+// worker, plus any inactive worker with punches in this period (so past
+// summaries stay complete after someone is deactivated), each with their
+// worked time broken down by day.
+func (m *TimePunchModel) PayPeriodSummary(payPeriod string) ([]PayPeriodSummaryRow, error) {
+	days, err := PayPeriodDays(payPeriod)
+	if err != nil {
+		return nil, err
+	}
+	dayIndex := make(map[string]int, len(days))
+	for i, d := range days {
+		dayIndex[d] = i
+	}
+
+	stmt := `SELECT w.id, w.worker_name, tp.id, tp.day, tp.start_time, tp.end_time
+		FROM workers w
+		LEFT JOIN time_punches tp ON tp.worker_id = w.id AND tp.pay_period = ?
+		WHERE w.active = TRUE OR tp.id IS NOT NULL
+		ORDER BY w.worker_name, tp.day, tp.start_time`
+
+	rows, err := m.DB.Query(stmt, payPeriod)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var order []int
+	byWorker := make(map[int]*PayPeriodSummaryRow)
+
+	for rows.Next() {
+		var workerID int
+		var workerName string
+		var punchID sql.NullInt64
+		var day, start, end sql.NullString
+		if err := rows.Scan(&workerID, &workerName, &punchID, &day, &start, &end); err != nil {
+			return nil, err
+		}
+
+		r, ok := byWorker[workerID]
+		if !ok {
+			r = &PayPeriodSummaryRow{WorkerID: workerID, WorkerName: workerName, Days: make([]DaySummary, len(days))}
+			for i, d := range days {
+				r.Days[i].Date = d
+			}
+			byWorker[workerID] = r
+			order = append(order, workerID)
+		}
+
+		if !punchID.Valid {
+			continue
+		}
+		idx, ok := dayIndex[day.String]
+		if !ok {
+			continue
+		}
+
+		startTime, err := time.Parse(time.RFC3339, start.String)
+		if err != nil {
+			return nil, err
+		}
+		worked := time.Since(startTime)
+		if end.Valid {
+			endTime, err := time.Parse(time.RFC3339, end.String)
+			if err != nil {
+				return nil, err
+			}
+			worked = endTime.Sub(startTime)
+		}
+
+		r.Days[idx].Worked += worked
+		r.Days[idx].PunchIDs = append(r.Days[idx].PunchIDs, int(punchID.Int64))
+		r.Total += worked
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]PayPeriodSummaryRow, len(order))
+	for i, id := range order {
+		out[i] = *byWorker[id]
+	}
+	return out, nil
 }

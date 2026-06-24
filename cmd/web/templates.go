@@ -19,6 +19,8 @@ type templateData struct {
 	Admin               *models.Admin
 	DashboardRows       []models.DashboardRow
 	TimesheetRows       []models.TimesheetRow
+	SummaryRows         []models.PayPeriodSummaryRow
+	SummaryDays         []string
 	PayPeriods          []string
 	CurrentPeriod       string
 	Workers             []models.Worker

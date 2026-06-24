@@ -37,6 +37,7 @@ func (app *application) adminRoutes() http.Handler {
 	protected.HandleFunc("GET /admin/{$}", app.adminDashboard)
 	protected.HandleFunc("POST /admin/logout", app.adminLogout)
 	protected.HandleFunc("GET /admin/timesheet", app.adminTimesheet)
+	protected.HandleFunc("GET /admin/summary", app.adminSummary)
 	protected.HandleFunc("GET /admin/punches/{id}/edit", app.adminEditPunchForm)
 	protected.HandleFunc("POST /admin/punches/{id}/edit", app.adminEditPunch)
 	protected.HandleFunc("GET /admin/workers", app.adminWorkers)

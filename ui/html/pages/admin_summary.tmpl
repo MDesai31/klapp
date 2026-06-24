@@ -1,0 +1,30 @@
+{{define "title"}}Summary{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>Pay period summary</h1>
+<p>Pay period starting {{.CurrentPeriod}}. Other periods:
+{{range .PayPeriods}}<a href="/admin/summary?period={{.}}">{{.}}</a> {{end}}
+</p>
+
+<table>
+<tr>
+    <th>Worker</th>
+    {{range .SummaryDays}}<th>{{.}}</th>{{end}}
+    <th>Total</th>
+</tr>
+{{range .SummaryRows}}
+<tr>
+    <td>{{.WorkerName}}</td>
+    {{range .Days}}
+    <td>
+        {{.Display}}
+        {{range .PunchIDs}} <a href="/admin/punches/{{.}}/edit">edit</a>{{end}}
+    </td>
+    {{end}}
+    <td>{{.TotalDisplay}}</td>
+</tr>
+{{end}}
+</table>
+{{end}}

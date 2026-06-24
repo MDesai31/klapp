@@ -22,3 +22,19 @@ the design.
 - `go test ./...` — model tests use a throwaway SQLite file per test (`t.TempDir()`),
   migrations applied fresh each run. No shared test DB, no race conditions, tests
   can run in parallel.
+
+## Manual/local testing
+- `klapp.service` (systemd) already runs the real binary on default ports `:4000`/`:8082`
+  against `/opt/klapp`'s db — never reuse those ports or that db for ad-hoc testing.
+  Use scratch ports/dsn, e.g. `go run ./cmd/web -addr=:14000 -admin-addr=:18082 -dsn="file:/tmp/x.db?_pragma=foreign_keys(1)"`,
+  and kill the spawned binary by PID after (`go run`'s child outlives `kill %1`).
+- `workers.phone` is `NOT NULL` but the Go model scans it as a plain `string`; any
+  row inserted by hand (not through the app) needs `phone = ''`, not `NULL`.
+
+## Key files
+- Worker site handlers: `cmd/web/handlers_punch.go`. Admin site handlers:
+  `cmd/web/handlers_admin.go`. Routes: `cmd/web/routes.go`. Template data struct:
+  `cmd/web/templates.go`.
+- There is exactly one "dashboard": `/admin` (`admin_dashboard.tmpl`), backed by
+  `models.DashboardStatus`/`DashboardRow` in `internal/models/time_punches.go`.
+  The worker-facing page is `punch.tmpl` ("Punch"), not a dashboard.

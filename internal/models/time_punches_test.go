@@ -1,7 +1,9 @@
 package models
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -154,6 +156,39 @@ func TestDashboardStatus(t *testing.T) {
 	if status[notIn].StartTime.Valid {
 		t.Errorf("worker %d: want no punch at all, got %+v", notIn, status[notIn])
 	}
+}
+
+func TestDashboardRowStatusLabel(t *testing.T) {
+	t.Run("not in", func(t *testing.T) {
+		r := DashboardRow{}
+		if got, want := r.StatusLabel(), "Not in"; got != want {
+			t.Errorf("StatusLabel() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("punched out", func(t *testing.T) {
+		start := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
+		end := start.Add(7*time.Hour + 45*time.Minute)
+		r := DashboardRow{
+			StartTime: sql.NullString{String: start.UTC().Format(time.RFC3339), Valid: true},
+			EndTime:   sql.NullString{String: end.UTC().Format(time.RFC3339), Valid: true},
+		}
+		want := fmt.Sprintf("Out at %s (7h 45m worked)", end.Format("3:04 PM"))
+		if got := r.StatusLabel(); got != want {
+			t.Errorf("StatusLabel() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("punched in", func(t *testing.T) {
+		start := time.Now().Add(-90 * time.Minute)
+		r := DashboardRow{
+			StartTime: sql.NullString{String: start.UTC().Format(time.RFC3339), Valid: true},
+		}
+		want := fmt.Sprintf("In since %s (1h 30m)", start.Format("3:04 PM"))
+		if got := r.StatusLabel(); got != want {
+			t.Errorf("StatusLabel() = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestForPayPeriodAndPayPeriods(t *testing.T) {

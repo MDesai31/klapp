@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -67,7 +68,8 @@ type DashboardRow struct {
 	EndTime    sql.NullString
 }
 
-// StatusLabel renders this row's status for the admin dashboard.
+// StatusLabel renders this row's status for the admin dashboard, including
+// elapsed time for an open punch or total worked time for a closed one.
 func (r DashboardRow) StatusLabel() string {
 	if !r.StartTime.Valid {
 		return "Not in"
@@ -77,13 +79,23 @@ func (r DashboardRow) StatusLabel() string {
 		return "?"
 	}
 	if !r.EndTime.Valid {
-		return "In since " + start.Local().Format("3:04 PM")
+		return fmt.Sprintf("In since %s (%s)", start.Local().Format("3:04 PM"), formatDuration(time.Since(start)))
 	}
 	end, err := time.Parse(time.RFC3339, r.EndTime.String)
 	if err != nil {
 		return "?"
 	}
-	return "Out at " + end.Local().Format("3:04 PM")
+	return fmt.Sprintf("Out at %s (%s worked)", end.Local().Format("3:04 PM"), formatDuration(end.Sub(start)))
+}
+
+// formatDuration renders a duration as "Xh Ym", or just "Ym" under an hour.
+func formatDuration(d time.Duration) string {
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	if h == 0 {
+		return fmt.Sprintf("%dm", m)
+	}
+	return fmt.Sprintf("%dh %dm", h, m)
 }
 
 type TimePunchModel struct {

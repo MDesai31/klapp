@@ -1,6 +1,7 @@
 # misc
 .DS_Store
 *.pem
+*.env
 
 # go
 /db/*.db
@@ -8,5 +9,7 @@
 /db/*.db-wal
 /cmd/web/web
 /cmd/seedadmin/seedadmin
+/cmd/sms/sms
 /web
 /seedadmin
+/sms

@@ -7,6 +7,8 @@ set -euo pipefail
 APP_DIR=/opt/klapp
 
 go build -o "$APP_DIR/web" ./cmd/web
+go build -o "$APP_DIR/invoice" ./cmd/invoice
 rsync -a --delete ui/ "$APP_DIR/ui/"
 
 sudo systemctl restart klapp
+sudo systemctl restart klapp-invoice

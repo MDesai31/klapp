@@ -8,11 +8,14 @@ sudo mkdir -p "$APP_DIR/db"
 sudo chown -R "$(whoami):$(whoami)" "$APP_DIR"
 
 go build -o "$APP_DIR/web" ./cmd/web
+go build -o "$APP_DIR/invoice" ./cmd/invoice
 rsync -a --delete ui/ "$APP_DIR/ui/"
 
 sudo cp deploy/klapp.service /etc/systemd/system/klapp.service
+sudo cp deploy/klapp-invoice.service /etc/systemd/system/klapp-invoice.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now klapp
+sudo systemctl enable --now klapp-invoice
 
 if ! command -v caddy >/dev/null; then
 	sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl

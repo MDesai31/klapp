@@ -51,3 +51,22 @@ func mustInsertWorker(t *testing.T, db *sql.DB, name, pin string, active bool) i
 
 	return int(id)
 }
+
+func mustInsertCustomer(t *testing.T, db *sql.DB, name, houseNumber, address string) int {
+	t.Helper()
+
+	result, err := db.Exec(
+		`INSERT INTO customers (name, phone, house_number, address) VALUES (?, '', ?, ?)`,
+		name, houseNumber, address,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return int(id)
+}

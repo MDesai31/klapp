@@ -1,0 +1,38 @@
+{{define "base"}}
+<!doctype html>
+<html lang="{{if .Spanish}}es{{else}}en{{end}}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{template "title" .}}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .autocomplete-wrapper { position: relative; margin-bottom: 0.25rem; }
+        .autocomplete-dropdown {
+            position: absolute; background: white; border: 1px solid #ccc;
+            width: 100%; z-index: 10; list-style: none; margin: 0; padding: 0;
+            box-shadow: 0 2px 6px rgba(0,0,0,.15);
+        }
+        .autocomplete-dropdown li {
+            padding: 0.6rem 0.75rem; cursor: pointer; font-size: 1rem;
+        }
+        .autocomplete-dropdown li:hover { background: #f0f4ff; }
+        .add-row-btn {
+            width: auto; font-size: 1rem; padding: 0.4rem 1rem;
+            margin-top: 0.25rem; background: #eee; border: 1px solid #ccc;
+            border-radius: 0.25rem; cursor: pointer;
+        }
+        select { font-size: 1.25rem; padding: 0.75rem; width: 100%; margin: 0.5rem 0; box-sizing: border-box; }
+        textarea { font-size: 1rem; padding: 0.75rem; width: 100%; margin: 0.5rem 0; box-sizing: border-box; min-height: 5rem; }
+        .customer-pick { list-style: none; padding: 0; margin: 0; border: 1px solid #ccc; background: white; }
+        .customer-pick li { padding: 0.6rem 0.75rem; cursor: pointer; }
+        .customer-pick li:hover { background: #f0f4ff; }
+    </style>
+</head>
+<body>
+    <main>
+        {{template "main" .}}
+    </main>
+</body>
+</html>
+{{end}}

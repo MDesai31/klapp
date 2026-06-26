@@ -86,3 +86,7 @@ tr.late {
 tr.not-in {
     color: #999;
 }
+
+tr.unreviewed {
+    background: #fff3cd;
+}

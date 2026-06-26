@@ -1,0 +1,34 @@
+{{define "title"}}Invoices{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
+<h1>Invoices</h1>
+
+<table>
+<tr><th>ID</th><th>Date</th><th>House</th><th>Customer</th><th>Submitted by</th><th>Status</th><th></th></tr>
+{{range .Invoices}}
+<tr{{if not .Reviewed}} class="unreviewed"{{end}}>
+    <td>#{{.ID}}</td>
+    <td>{{.Date}}</td>
+    <td>{{.HouseNumber}}</td>
+    <td>{{if .CustomerName}}{{.CustomerName}}{{else}}—{{end}}</td>
+    <td>{{.WorkerName}}</td>
+    <td>{{if .Reviewed}}Reviewed{{else}}Pending{{end}}</td>
+    <td><a href="/admin/invoices/{{.ID}}">View</a></td>
+</tr>
+{{else}}
+<tr><td colspan="7">No invoices yet.</td></tr>
+{{end}}
+</table>
+
+{{if gt .TotalPages 1}}
+<p>
+{{if gt .CurrentPage 1}}<a href="?page={{.PrevPage}}">← Previous</a>{{end}}
+Page {{.CurrentPage}} of {{.TotalPages}}
+{{if lt .CurrentPage .TotalPages}}<a href="?page={{.NextPage}}">Next →</a>{{end}}
+</p>
+{{end}}
+{{end}}

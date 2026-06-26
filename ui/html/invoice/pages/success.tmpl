@@ -1,0 +1,9 @@
+{{define "title"}}{{if .Spanish}}Enviado{{else}}Submitted{{end}}{{end}}
+
+{{define "main"}}
+<div class="center">
+<h1>{{if .Spanish}}¡Listo!{{else}}Done!{{end}}</h1>
+<p>{{if .Spanish}}Tu factura fue enviada. Gracias.{{else}}Your invoice was submitted. Thank you.{{end}}</p>
+<a href="/">{{if .Spanish}}Enviar otra{{else}}Submit another{{end}}</a>
+</div>
+{{end}}

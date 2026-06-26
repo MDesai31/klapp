@@ -45,6 +45,26 @@ func (app *application) adminRoutes() http.Handler {
 	protected.HandleFunc("GET /admin/workers/{id}/edit", app.adminEditWorkerForm)
 	protected.HandleFunc("POST /admin/workers/{id}/edit", app.adminEditWorker)
 	protected.HandleFunc("POST /admin/workers/{id}/toggle-active", app.adminToggleWorkerActive)
+
+	// invoices
+	protected.HandleFunc("GET /admin/invoices", app.adminInvoices)
+	protected.HandleFunc("GET /admin/invoices/{id}", app.adminInvoiceView)
+	protected.HandleFunc("POST /admin/invoices/{id}/submit", app.adminInvoiceSubmit)
+
+	// catalog (job descriptions + materials)
+	protected.HandleFunc("GET /admin/catalog", app.adminJobDescriptions)
+	protected.HandleFunc("POST /admin/catalog/jobs", app.adminCreateJobDescription)
+	protected.HandleFunc("POST /admin/catalog/jobs/{id}/delete", app.adminDeleteJobDescription)
+	protected.HandleFunc("POST /admin/catalog/materials", app.adminCreateMaterial)
+	protected.HandleFunc("POST /admin/catalog/materials/{id}/delete", app.adminDeleteMaterial)
+
+	// customers
+	protected.HandleFunc("GET /admin/customers", app.adminCustomers)
+	protected.HandleFunc("POST /admin/customers", app.adminCreateCustomer)
+	protected.HandleFunc("GET /admin/customers/{id}", app.adminCustomerView)
+	protected.HandleFunc("GET /admin/customers/{id}/edit", app.adminEditCustomerForm)
+	protected.HandleFunc("POST /admin/customers/{id}/edit", app.adminEditCustomer)
+
 	mux.Handle("/admin/", app.requireAdmin(protected))
 
 	return app.sessionManager.LoadAndSave(mux)

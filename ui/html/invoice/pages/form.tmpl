@@ -1,0 +1,171 @@
+{{define "title"}}{{if .Spanish}}Nueva Factura{{else}}New Invoice{{end}}{{end}}
+
+{{define "main"}}
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
+<h1>{{if .Spanish}}Hola {{.Worker.WorkerName}}{{else}}Hello {{.Worker.WorkerName}}{{end}}</h1>
+
+<form action="/form" method="POST" id="invoice-form">
+
+    <label for="date">{{if .Spanish}}Fecha{{else}}Date{{end}}</label>
+    <input type="date" id="date" name="date" value="{{.FormDate}}" required>
+
+    <label for="house_number">{{if .Spanish}}Número de casa{{else}}House number{{end}}</label>
+    <input type="text" inputmode="numeric" id="house_number" name="house_number" value="{{.FormHouseNumber}}" required autocomplete="off">
+    <ul id="customer-pick" class="customer-pick" style="display:none"></ul>
+
+    <label for="customer_name">{{if .Spanish}}Nombre del cliente{{else}}Customer name{{end}}</label>
+    <input type="text" id="customer_name" name="customer_name" value="{{.FormCustomerName}}" autocomplete="off">
+    <input type="hidden" id="customer_id" name="customer_id" value="{{.FormCustomerID}}">
+
+    <label for="no_of_workers">{{if .Spanish}}Número de trabajadores{{else}}Number of workers{{end}}</label>
+    <input type="number" id="no_of_workers" name="no_of_workers" value="{{.FormNoOfWorkers}}" min="1" required>
+
+    <label for="time_arrived">{{if .Spanish}}Hora de llegada{{else}}Time arrived{{end}}</label>
+    <input type="time" id="time_arrived" name="time_arrived" value="{{.FormTimeArrived}}" required>
+
+    <label for="time_left">{{if .Spanish}}Hora de salida{{else}}Time left{{end}}</label>
+    <input type="time" id="time_left" name="time_left" value="{{.FormTimeLeft}}" required>
+
+    <label>{{if .Spanish}}Trabajos realizados{{else}}Job descriptions{{end}}</label>
+    <div id="jobs-container">
+        {{range .FormJobs}}
+        <div class="autocomplete-wrapper">
+            <input type="text" name="job" value="{{.}}" autocomplete="off" class="job-input"
+                   placeholder="{{if $.Spanish}}Describe el trabajo...{{else}}Describe the work...{{end}}">
+        </div>
+        {{end}}
+        <button type="button" class="add-row-btn" onclick="addRow('jobs-container','job','{{if .Spanish}}Describe el trabajo...{{else}}Describe the work...{{end}}')">+ {{if .Spanish}}Agregar{{else}}Add{{end}}</button>
+    </div>
+
+    <label>{{if .Spanish}}Materiales utilizados{{else}}Materials used{{end}}</label>
+    <div id="materials-container">
+        {{range .FormMaterials}}
+        <div class="autocomplete-wrapper">
+            <input type="text" name="material" value="{{.}}" autocomplete="off" class="material-input"
+                   placeholder="{{if $.Spanish}}Material...{{else}}Material...{{end}}">
+        </div>
+        {{end}}
+        <button type="button" class="add-row-btn" onclick="addRow('materials-container','material','{{if .Spanish}}Material...{{else}}Material...{{end}}')">+ {{if .Spanish}}Agregar{{else}}Add{{end}}</button>
+    </div>
+
+    <label for="comments">{{if .Spanish}}Comentarios{{else}}Comments{{end}}</label>
+    <textarea id="comments" name="comments">{{.FormComments}}</textarea>
+
+    <button type="submit" style="margin-top:1.5rem">{{if .Spanish}}Enviar factura{{else}}Submit invoice{{end}}</button>
+</form>
+
+<script>
+(function() {
+    var spanish = {{if .Spanish}}true{{else}}false{{end}};
+    var unknownLabel = spanish ? 'No sé' : "I don't know";
+
+    // ── House number → customer lookup ──────────────────────────────────────
+    var houseInput   = document.getElementById('house_number');
+    var nameInput    = document.getElementById('customer_name');
+    var idInput      = document.getElementById('customer_id');
+    var pickList     = document.getElementById('customer-pick');
+    var houseTimer;
+
+    houseInput.addEventListener('input', function() {
+        clearTimeout(houseTimer);
+        var val = houseInput.value.trim();
+        pickList.innerHTML = '';
+        pickList.style.display = 'none';
+        idInput.value = '';
+        if (!val) return;
+        houseTimer = setTimeout(function() {
+            fetch('/api/customers?house_number=' + encodeURIComponent(val))
+                .then(function(r) { return r.json(); })
+                .then(function(customers) {
+                    if (!customers || customers.length === 0) return;
+                    pickList.innerHTML = '';
+                    var li = document.createElement('li');
+                    li.textContent = unknownLabel;
+                    li.addEventListener('click', function() {
+                        nameInput.value = '';
+                        idInput.value = '';
+                        pickList.innerHTML = '';
+                        pickList.style.display = 'none';
+                    });
+                    pickList.appendChild(li);
+                    customers.forEach(function(c) {
+                        var li = document.createElement('li');
+                        li.textContent = c.name + (c.address ? ' — ' + c.address : '');
+                        li.addEventListener('click', function() {
+                            nameInput.value = c.name;
+                            idInput.value = c.id;
+                            pickList.innerHTML = '';
+                            pickList.style.display = 'none';
+                        });
+                        pickList.appendChild(li);
+                    });
+                    pickList.style.display = '';
+                });
+        }, 300);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target !== houseInput) { pickList.innerHTML = ''; pickList.style.display = 'none'; }
+    });
+
+    // ── Generic text-box autocomplete ────────────────────────────────────────
+    function setupAutocomplete(container, apiPath) {
+        container.addEventListener('input', function(e) {
+            var input = e.target;
+            if (input.tagName !== 'INPUT') return;
+            var val = input.value.trim();
+            var drop = input.parentNode.querySelector('.autocomplete-dropdown');
+            if (!drop) {
+                drop = document.createElement('ul');
+                drop.className = 'autocomplete-dropdown';
+                input.parentNode.appendChild(drop);
+            }
+            drop.innerHTML = '';
+            if (!val) return;
+            fetch(apiPath + '?q=' + encodeURIComponent(val))
+                .then(function(r) { return r.json(); })
+                .then(function(items) {
+                    if (!items || items.length === 0) return;
+                    items.forEach(function(item) {
+                        var li = document.createElement('li');
+                        li.textContent = item;
+                        li.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            input.value = item;
+                            drop.innerHTML = '';
+                        });
+                        drop.appendChild(li);
+                    });
+                });
+        });
+        container.addEventListener('focusout', function(e) {
+            setTimeout(function() {
+                container.querySelectorAll('.autocomplete-dropdown').forEach(function(d) {
+                    d.innerHTML = '';
+                });
+            }, 150);
+        });
+    }
+
+    setupAutocomplete(document.getElementById('jobs-container'), '/api/jobs');
+    setupAutocomplete(document.getElementById('materials-container'), '/api/materials');
+
+    // ── Add row ──────────────────────────────────────────────────────────────
+    window.addRow = function(containerId, name, placeholder) {
+        var container = document.getElementById(containerId);
+        var btn = container.querySelector('.add-row-btn');
+        var wrapper = document.createElement('div');
+        wrapper.className = 'autocomplete-wrapper';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.name = name;
+        input.autocomplete = 'off';
+        input.placeholder = placeholder;
+        wrapper.appendChild(input);
+        container.insertBefore(wrapper, btn);
+        input.focus();
+    };
+})();
+</script>
+{{end}}

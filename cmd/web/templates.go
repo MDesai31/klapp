@@ -16,7 +16,7 @@ type templateData struct {
 	PIN       string // echoed into a hidden field so punch in/out can resend it
 	Spanish   bool   // true when the worker's language is spanish (or unknown)
 
-	// admin site
+	// admin site — timekeeping
 	Admin               *models.Admin
 	DashboardRows       []models.DashboardRow
 	TimesheetRows       []models.TimesheetRow
@@ -27,6 +27,23 @@ type templateData struct {
 	Workers             []models.Worker
 	ShowInactiveWorkers bool
 	Punch               *models.TimePunch
+
+	// admin site — invoices
+	Invoices    []models.Invoice
+	Invoice     *models.Invoice
+	CurrentPage int
+	TotalPages  int
+	PrevPage    int
+	NextPage    int
+
+	// admin site — customers
+	Customers   []models.Customer
+	Customer    *models.Customer
+	SearchQuery string
+
+	// admin site — catalog
+	JobDescriptions []models.JobDescription
+	Materials       []models.Material
 
 	Flash string
 }

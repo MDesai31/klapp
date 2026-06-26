@@ -1,0 +1,50 @@
+{{define "title"}}Customers{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
+<h1>Customers</h1>
+
+<form action="/admin/customers" method="GET" style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;">
+    <input type="text" name="q" value="{{.SearchQuery}}" placeholder="Search name, house, address…" style="width:auto;flex:1;">
+    <button type="submit" style="width:auto;">Search</button>
+    {{if .SearchQuery}}<a href="/admin/customers">Clear</a>{{end}}
+</form>
+
+<table>
+<tr><th>Name</th><th>House #</th><th>Address</th><th>Phone</th><th></th></tr>
+{{range .Customers}}
+<tr>
+    <td>{{.Name}}</td>
+    <td>{{.HouseNumber}}</td>
+    <td>{{.Address}}</td>
+    <td>{{.Phone}}</td>
+    <td>
+        <a href="/admin/customers/{{.ID}}">View</a>
+        <a href="/admin/customers/{{.ID}}/edit">Edit</a>
+    </td>
+</tr>
+{{else}}
+<tr><td colspan="5">No customers found.</td></tr>
+{{end}}
+</table>
+
+<h2>Add customer</h2>
+<form action="/admin/customers" method="POST">
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" required>
+
+    <label for="house_number">House number</label>
+    <input type="text" id="house_number" name="house_number" required>
+
+    <label for="address">Address</label>
+    <input type="text" id="address" name="address">
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone">
+
+    <button type="submit">Add</button>
+</form>
+{{end}}

@@ -1,0 +1,42 @@
+{{define "title"}}Invoice #{{.Invoice.ID}}{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
+<h1>Invoice #{{.Invoice.ID}}</h1>
+
+<table>
+<tr><th>Date</th><td>{{.Invoice.Date}}</td></tr>
+<tr><th>Submitted by</th><td>{{.Invoice.WorkerName}}</td></tr>
+<tr><th>House number</th><td>{{.Invoice.HouseNumber}}</td></tr>
+<tr><th>Customer</th><td>{{if .Invoice.CustomerName}}{{.Invoice.CustomerName}}{{else}}—{{end}}</td></tr>
+<tr><th>Arrived</th><td>{{.Invoice.TimeArrived}}</td></tr>
+<tr><th>Left</th><td>{{.Invoice.TimeLeft}}</td></tr>
+<tr><th>Workers</th><td>{{.Invoice.NoOfWorkers}}</td></tr>
+<tr><th>Jobs</th><td>
+    {{if .Invoice.Jobs}}
+    <ul>{{range .Invoice.Jobs}}<li>{{.}}</li>{{end}}</ul>
+    {{else}}—{{end}}
+</td></tr>
+<tr><th>Materials</th><td>
+    {{if .Invoice.Materials}}
+    <ul>{{range .Invoice.Materials}}<li>{{.}}</li>{{end}}</ul>
+    {{else}}—{{end}}
+</td></tr>
+<tr><th>Comments</th><td>{{if .Invoice.Comments}}{{.Invoice.Comments}}{{else}}—{{end}}</td></tr>
+<tr><th>Status</th><td>{{if .Invoice.Reviewed}}Reviewed ✓{{else}}<strong>Pending review</strong>{{end}}</td></tr>
+</table>
+
+<div style="margin-top:1.5rem; display:flex; gap:1rem; align-items:center;">
+    {{if not .Invoice.Reviewed}}
+    <form action="/admin/invoices/{{.Invoice.ID}}/submit" method="POST" style="width:auto;">
+        <button type="submit" class="btn btn-in" style="font-size:1rem;padding:0.75rem 2rem;">Submit &amp; mark reviewed</button>
+    </form>
+    {{else}}
+    <button disabled style="font-size:1rem;padding:0.75rem 2rem;opacity:0.5;cursor:default;">Already submitted</button>
+    {{end}}
+    <a href="/admin/invoices">← Back to list</a>
+</div>
+{{end}}

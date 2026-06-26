@@ -1,0 +1,70 @@
+{{define "title"}}Catalog{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
+<h1>Catalog</h1>
+
+<h2>Job descriptions</h2>
+<table>
+<tr><th>Description</th><th></th></tr>
+{{range .JobDescriptions}}
+<tr>
+    <td>{{.Description}}</td>
+    <td>
+        <form action="/admin/catalog/jobs/{{.ID}}/delete" method="POST" class="inline">
+            <button type="submit">Delete</button>
+        </form>
+    </td>
+</tr>
+{{else}}
+<tr><td colspan="2">No job descriptions yet.</td></tr>
+{{end}}
+</table>
+
+<h3>Add job description</h3>
+<form action="/admin/catalog/jobs" method="POST" style="display:flex;gap:0.5rem;align-items:flex-end;">
+    <div style="flex:1;">
+        <label for="description">Description</label>
+        <input type="text" id="description" name="description" required>
+    </div>
+    <button type="submit" style="width:auto;">Add</button>
+</form>
+
+<hr style="margin:2rem 0;">
+
+<h2>Materials</h2>
+<table>
+<tr><th>Name</th><th>Unit</th><th>Price</th><th></th></tr>
+{{range .Materials}}
+<tr>
+    <td>{{.Name}}</td>
+    <td>{{.Unit}}</td>
+    <td>{{if .Price}}${{printf "%.2f" .Price}}{{else}}—{{end}}</td>
+    <td>
+        <form action="/admin/catalog/materials/{{.ID}}/delete" method="POST" class="inline">
+            <button type="submit">Delete</button>
+        </form>
+    </td>
+</tr>
+{{else}}
+<tr><td colspan="4">No materials yet.</td></tr>
+{{end}}
+</table>
+
+<h3>Add material</h3>
+<form action="/admin/catalog/materials" method="POST">
+    <label for="mat_name">Name</label>
+    <input type="text" id="mat_name" name="name" required>
+
+    <label for="mat_unit">Unit (e.g. bag, lb, gallon)</label>
+    <input type="text" id="mat_unit" name="unit">
+
+    <label for="mat_price">Price ($)</label>
+    <input type="number" id="mat_price" name="price" min="0" step="0.01" placeholder="0.00">
+
+    <button type="submit">Add</button>
+</form>
+{{end}}

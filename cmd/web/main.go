@@ -22,6 +22,9 @@ type application struct {
 	workers        *models.WorkerModel
 	timePunches    *models.TimePunchModel
 	admins         *models.AdminModel
+	customers      *models.CustomerModel
+	invoices       *models.InvoiceModel
+	catalog        *models.CatalogModel
 	templateCache  map[string]*template.Template
 	sessionManager *scs.SessionManager
 }
@@ -60,6 +63,9 @@ func main() {
 		workers:        &models.WorkerModel{DB: sqlDB},
 		timePunches:    &models.TimePunchModel{DB: sqlDB},
 		admins:         &models.AdminModel{DB: sqlDB},
+		customers:      &models.CustomerModel{DB: sqlDB},
+		invoices:       &models.InvoiceModel{DB: sqlDB},
+		catalog:        &models.CatalogModel{DB: sqlDB},
 		templateCache:  templateCache,
 		sessionManager: sessionManager,
 	}

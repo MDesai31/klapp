@@ -1,0 +1,31 @@
+{{define "title"}}{{.Customer.Name}}{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>{{.Customer.Name}}</h1>
+<p>
+    House: <strong>{{.Customer.HouseNumber}}</strong>
+    {{if .Customer.Address}} · {{.Customer.Address}}{{end}}
+    {{if .Customer.Phone}} · {{.Customer.Phone}}{{end}}
+    · <a href="/admin/customers/{{.Customer.ID}}/edit">Edit</a>
+</p>
+
+<h2>Invoices</h2>
+<table>
+<tr><th>ID</th><th>Date</th><th>Workers</th><th>Status</th><th></th></tr>
+{{range .Invoices}}
+<tr{{if not .Reviewed}} class="unreviewed"{{end}}>
+    <td>#{{.ID}}</td>
+    <td>{{.Date}}</td>
+    <td>{{.NoOfWorkers}}</td>
+    <td>{{if .Reviewed}}Reviewed{{else}}Pending{{end}}</td>
+    <td><a href="/admin/invoices/{{.ID}}">View</a></td>
+</tr>
+{{else}}
+<tr><td colspan="5">No invoices for this customer.</td></tr>
+{{end}}
+</table>
+
+<p><a href="/admin/customers">← Back to customers</a></p>
+{{end}}

@@ -1,0 +1,13 @@
+{{define "title"}}{{if .Spanish}}Factura - PIN{{else}}Invoice - PIN{{end}}{{end}}
+
+{{define "main"}}
+<div class="center">
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+<h1>{{if .Spanish}}Enviar Factura{{else}}Submit Invoice{{end}}</h1>
+<form action="/" method="POST">
+    <label for="pin">{{if .Spanish}}Ingresa tu PIN{{else}}Enter your PIN{{end}}</label>
+    <input type="password" inputmode="numeric" id="pin" name="pin" autofocus required>
+    <button type="submit">{{if .Spanish}}Continuar{{else}}Continue{{end}}</button>
+</form>
+</div>
+{{end}}

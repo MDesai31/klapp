@@ -1,0 +1,23 @@
+{{define "title"}}Edit Customer{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>Edit Customer</h1>
+<form action="/admin/customers/{{.Customer.ID}}/edit" method="POST">
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" value="{{.Customer.Name}}" required>
+
+    <label for="house_number">House number</label>
+    <input type="text" id="house_number" name="house_number" value="{{.Customer.HouseNumber}}" required>
+
+    <label for="address">Address</label>
+    <input type="text" id="address" name="address" value="{{.Customer.Address}}">
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone" value="{{.Customer.Phone}}">
+
+    <button type="submit">Save</button>
+</form>
+<p><a href="/admin/customers/{{.Customer.ID}}">Cancel</a></p>
+{{end}}

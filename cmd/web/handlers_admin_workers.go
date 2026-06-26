@@ -8,6 +8,24 @@ import (
 	"klapp/internal/models"
 )
 
+func parseHourlyRate(s string) float64 {
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil || v < 0 {
+		return 0
+	}
+	return v
+}
+
+func parseLanguage(s string) string {
+	if s == "english" {
+		return "english"
+	}
+	return "spanish"
+}
+
 func (app *application) adminWorkers(w http.ResponseWriter, r *http.Request) {
 	showInactive := r.URL.Query().Has("show_inactive")
 
@@ -39,13 +57,15 @@ func (app *application) adminCreateWorker(w http.ResponseWriter, r *http.Request
 	name := r.PostFormValue("worker_name")
 	pin := r.PostFormValue("pin")
 	phone := r.PostFormValue("phone")
+	hourlyRate := parseHourlyRate(r.PostFormValue("hourly_rate"))
+	language := parseLanguage(r.PostFormValue("language"))
 
 	if name == "" || pin == "" {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 
-	if _, err := app.workers.Create(name, pin, phone); err != nil {
+	if _, err := app.workers.Create(name, pin, phone, hourlyRate, language); err != nil {
 		if errors.Is(err, models.ErrDuplicatePIN) {
 			workers, err := app.workers.List()
 			if err != nil {
@@ -95,19 +115,21 @@ func (app *application) adminEditWorker(w http.ResponseWriter, r *http.Request) 
 	name := r.PostFormValue("worker_name")
 	pin := r.PostFormValue("pin")
 	phone := r.PostFormValue("phone")
+	hourlyRate := parseHourlyRate(r.PostFormValue("hourly_rate"))
+	language := parseLanguage(r.PostFormValue("language"))
 
 	if name == "" || pin == "" {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 
-	if err := app.workers.Update(id, name, pin, phone); err != nil {
+	if err := app.workers.Update(id, name, pin, phone, hourlyRate, language); err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
 			app.clientError(w, http.StatusNotFound)
 			return
 		}
 		if errors.Is(err, models.ErrDuplicatePIN) {
-			worker := models.Worker{ID: id, WorkerName: name, PIN: pin, Phone: phone}
+			worker := models.Worker{ID: id, WorkerName: name, PIN: pin, Phone: phone, HourlyRate: hourlyRate, Language: language}
 			app.render(w, r, http.StatusOK, "admin_edit_worker.tmpl", templateData{
 				Worker: &worker,
 				Flash:  "That PIN is already in use by another worker.",

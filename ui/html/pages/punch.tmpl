@@ -1,4 +1,4 @@
-{{define "title"}}Punch{{end}}
+{{define "title"}}{{if .Spanish}}Fichar{{else}}Punch{{end}}{{end}}
 
 {{define "main"}}
 <div class="center">
@@ -6,28 +6,28 @@
 
 {{if not .Worker}}
 <form action="/punch" method="POST">
-    <label for="pin">Enter your PIN</label>
+    <label for="pin">{{if .Spanish}}Ingresa tu PIN{{else}}Enter your PIN{{end}}</label>
     <input type="password" inputmode="numeric" id="pin" name="pin" autofocus required>
-    <button type="submit">Continue</button>
+    <button type="submit">{{if .Spanish}}Continuar{{else}}Continue{{end}}</button>
 </form>
 
 {{else}}
-<h1>Hello {{.Worker.WorkerName}}</h1>
+<h1>{{if .Spanish}}Hola{{else}}Hello{{end}} {{.Worker.WorkerName}}</h1>
 
 {{if .OpenPunch}}
-<p>Punched in at {{.OpenPunch.StartTime.Local.Format "3:04 PM"}}</p>
+<p>{{if .Spanish}}Entrada a las{{else}}Punched in at{{end}} {{.OpenPunch.StartTime.Local.Format "3:04 PM"}}</p>
 <form id="punch-form" action="/punch/out" method="POST">
     <input type="hidden" name="pin" value="{{.PIN}}">
     <input type="hidden" name="lat">
     <input type="hidden" name="lon">
-    <button type="submit" class="btn btn-out">Punch Out</button>
+    <button type="submit" class="btn btn-out">{{if .Spanish}}Registrar Salida{{else}}Punch Out{{end}}</button>
 </form>
 {{else}}
 <form id="punch-form" action="/punch/in" method="POST">
     <input type="hidden" name="pin" value="{{.PIN}}">
     <input type="hidden" name="lat">
     <input type="hidden" name="lon">
-    <button type="submit" class="btn btn-in">Punch In</button>
+    <button type="submit" class="btn btn-in">{{if .Spanish}}Registrar Entrada{{else}}Punch In{{end}}</button>
 </form>
 {{end}}
 {{end}}
@@ -40,16 +40,28 @@
 
     var button = form.querySelector("button");
     button.disabled = true;
+    {{if .Spanish}}
+    button.textContent = "Obteniendo ubicación...";
+    {{else}}
     button.textContent = "Getting location...";
+    {{end}}
 
     navigator.geolocation.getCurrentPosition(function (pos) {
         form.lat.value = pos.coords.latitude;
         form.lon.value = pos.coords.longitude;
         button.disabled = false;
+        {{if .Spanish}}
+        button.textContent = form.action.endsWith("/out") ? "Registrar Salida" : "Registrar Entrada";
+        {{else}}
         button.textContent = form.action.endsWith("/out") ? "Punch Out" : "Punch In";
+        {{end}}
     }, function () {
         button.disabled = false;
+        {{if .Spanish}}
+        button.textContent = "Ubicación no disponible - intenta de nuevo";
+        {{else}}
         button.textContent = "Location unavailable - try again";
+        {{end}}
     });
 })();
 </script>

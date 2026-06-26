@@ -13,6 +13,7 @@
     <th>Worker</th>
     {{range .SummaryDays}}<th>{{.}}</th>{{end}}
     <th>Total</th>
+    <th>Salary</th>
 </tr>
 {{range .SummaryRows}}
 <tr>
@@ -24,6 +25,7 @@
     </td>
     {{end}}
     <td>{{.TotalDisplay}}</td>
+    <td>{{.SalaryDisplay}}</td>
 </tr>
 {{end}}
 </table>

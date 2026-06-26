@@ -385,6 +385,7 @@ func (m *TimePunchModel) PayPeriods() ([]string, error) {
 type PayPeriodSummaryRow struct {
 	WorkerID   int
 	WorkerName string
+	HourlyRate float64
 	Days       []DaySummary // one per day of the pay period, in order
 	Total      time.Duration
 }
@@ -396,6 +397,15 @@ func (r PayPeriodSummaryRow) TotalDisplay() string {
 		return "-"
 	}
 	return formatDuration(r.Total)
+}
+
+// SalaryDisplay renders the pre-tax salary owed for the period, or "-" if
+// the worker has no hourly rate configured or no hours worked.
+func (r PayPeriodSummaryRow) SalaryDisplay() string {
+	if r.HourlyRate == 0 || r.Total == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("$%.2f", r.Total.Hours()*r.HourlyRate)
 }
 
 // DaySummary is a worker's worked time on a single day within a pay
@@ -430,7 +440,7 @@ func (m *TimePunchModel) PayPeriodSummary(payPeriod string) ([]PayPeriodSummaryR
 		dayIndex[d] = i
 	}
 
-	stmt := `SELECT w.id, w.worker_name, tp.id, tp.day, tp.start_time, tp.end_time
+	stmt := `SELECT w.id, w.worker_name, w.hourly_rate, tp.id, tp.day, tp.start_time, tp.end_time
 		FROM workers w
 		LEFT JOIN time_punches tp ON tp.worker_id = w.id AND tp.pay_period = ?
 		WHERE w.active = TRUE OR tp.id IS NOT NULL
@@ -448,15 +458,16 @@ func (m *TimePunchModel) PayPeriodSummary(payPeriod string) ([]PayPeriodSummaryR
 	for rows.Next() {
 		var workerID int
 		var workerName string
+		var hourlyRate float64
 		var punchID sql.NullInt64
 		var day, start, end sql.NullString
-		if err := rows.Scan(&workerID, &workerName, &punchID, &day, &start, &end); err != nil {
+		if err := rows.Scan(&workerID, &workerName, &hourlyRate, &punchID, &day, &start, &end); err != nil {
 			return nil, err
 		}
 
 		r, ok := byWorker[workerID]
 		if !ok {
-			r = &PayPeriodSummaryRow{WorkerID: workerID, WorkerName: workerName, Days: make([]DaySummary, len(days))}
+			r = &PayPeriodSummaryRow{WorkerID: workerID, WorkerName: workerName, HourlyRate: hourlyRate, Days: make([]DaySummary, len(days))}
 			for i, d := range days {
 				r.Days[i].Date = d
 			}

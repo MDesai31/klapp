@@ -14,6 +14,7 @@ type templateData struct {
 	Worker    *models.Worker
 	OpenPunch *models.TimePunch
 	PIN       string // echoed into a hidden field so punch in/out can resend it
+	Spanish   bool   // true when the worker's language is spanish (or unknown)
 
 	// admin site
 	Admin               *models.Admin

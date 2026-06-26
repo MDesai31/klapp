@@ -1,18 +1,18 @@
-{{define "title"}}Late Punch Out{{end}}
+{{define "title"}}{{if .Spanish}}Salida Tardía{{else}}Late Punch Out{{end}}{{end}}
 
 {{define "main"}}
 <div class="center">
 {{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
 
-<h1>Forgot to punch out?</h1>
+<h1>{{if .Spanish}}¿Olvidaste registrar tu salida?{{else}}Forgot to punch out?{{end}}</h1>
 <form action="/punch/late" method="POST">
     <label for="pin">PIN</label>
     <input type="password" inputmode="numeric" id="pin" name="pin" autofocus required>
 
-    <label for="end_time">What time did you finish?</label>
+    <label for="end_time">{{if .Spanish}}¿A qué hora terminaste?{{else}}What time did you finish?{{end}}</label>
     <input type="time" id="end_time" name="end_time" required>
 
-    <button type="submit">Submit</button>
+    <button type="submit">{{if .Spanish}}Enviar{{else}}Submit{{end}}</button>
 </form>
 </div>
 {{end}}

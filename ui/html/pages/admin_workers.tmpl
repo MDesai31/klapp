@@ -12,12 +12,14 @@
 <p><a href="/admin/workers?show_inactive=1">Show deactivated workers</a></p>
 {{end}}
 <table>
-<tr><th>Name</th><th>PIN</th><th>Phone</th><th>Active</th><th></th></tr>
+<tr><th>Name</th><th>PIN</th><th>Phone</th><th>Hourly Rate</th><th>Language</th><th>Active</th><th></th></tr>
 {{range .Workers}}
 <tr>
     <td>{{.WorkerName}}</td>
     <td>{{.PIN}}</td>
     <td>{{.Phone}}</td>
+    <td>{{if .HourlyRate}}${{printf "%.2f" .HourlyRate}}{{else}}-{{end}}</td>
+    <td>{{if eq .Language "english"}}English{{else}}Spanish{{end}}</td>
     <td>{{if .Active}}yes{{else}}no{{end}}</td>
     <td>
         <a href="/admin/workers/{{.ID}}/edit">Edit</a>
@@ -39,6 +41,15 @@
 
     <label for="phone">Phone</label>
     <input type="tel" id="phone" name="phone">
+
+    <label for="hourly_rate">Hourly Rate ($)</label>
+    <input type="number" id="hourly_rate" name="hourly_rate" min="0" step="0.01" placeholder="0.00">
+
+    <label for="language">Language</label>
+    <select id="language" name="language">
+        <option value="spanish" selected>Spanish</option>
+        <option value="english">English</option>
+    </select>
 
     <button type="submit">Add</button>
 </form>

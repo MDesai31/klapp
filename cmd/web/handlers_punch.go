@@ -10,7 +10,7 @@ import (
 )
 
 func (app *application) punchForm(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{})
+	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Spanish: true})
 }
 
 // punchStatus identifies the worker by PIN and shows whether they're
@@ -24,7 +24,8 @@ func (app *application) punchStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := templateData{Worker: &worker, PIN: pin}
+	spanish := worker.Language != "english"
+	data := templateData{Worker: &worker, PIN: pin, Spanish: spanish}
 
 	open, err := app.timePunches.Open(worker.ID)
 	if err == nil {
@@ -63,7 +64,8 @@ func (app *application) punchIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Worker: &worker, OpenPunch: &open, PIN: pin})
+	spanish := worker.Language != "english"
+	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Worker: &worker, OpenPunch: &open, PIN: pin, Spanish: spanish})
 }
 
 func (app *application) punchOut(w http.ResponseWriter, r *http.Request) {
@@ -86,11 +88,13 @@ func (app *application) punchOut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Worker: &worker, Flash: "Punched out. See you next time!"})
+	spanish := worker.Language != "english"
+	flash := pickMsg(spanish, "¡Salida registrada! Hasta la próxima.", "Punched out. See you next time!")
+	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
 }
 
 func (app *application) punchLateForm(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{})
+	app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Spanish: true})
 }
 
 // punchLate handles the 9pm late-notice link: worker enters their PIN and
@@ -103,9 +107,12 @@ func (app *application) punchLate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	spanish := worker.Language != "english"
+
 	clockTime, err := time.Parse("15:04", r.PostFormValue("end_time"))
 	if err != nil {
-		app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Flash: "Enter a valid time."})
+		flash := pickMsg(spanish, "Ingresa una hora válida.", "Enter a valid time.")
+		app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
 		return
 	}
 	now := time.Now()
@@ -114,22 +121,32 @@ func (app *application) punchLate(w http.ResponseWriter, r *http.Request) {
 	err = app.timePunches.PunchOutLate(worker.ID, endTime)
 	if err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
-			app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Flash: "No open punch found for you today."})
+			flash := pickMsg(spanish, "No hay entrada abierta para hoy.", "No open punch found for you today.")
+			app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
 			return
 		}
 		app.serverError(w, r, err)
 		return
 	}
 
-	app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Flash: "Got it, thanks for letting us know."})
+	flash := pickMsg(spanish, "¡Listo, gracias por avisarnos!", "Got it, thanks for letting us know.")
+	app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
 }
 
 func (app *application) showInvalidPIN(w http.ResponseWriter, r *http.Request, page string, err error) {
 	if errors.Is(err, models.ErrInvalidPIN) {
-		app.render(w, r, http.StatusOK, page, templateData{Flash: "PIN not recognized. Try again."})
+		// Worker is unknown at this point; default to Spanish since most workers are Spanish-speaking.
+		app.render(w, r, http.StatusOK, page, templateData{Spanish: true, Flash: "PIN no reconocido. Inténtalo de nuevo."})
 		return
 	}
 	app.serverError(w, r, err)
+}
+
+func pickMsg(spanish bool, es, en string) string {
+	if spanish {
+		return es
+	}
+	return en
 }
 
 func parseCoords(r *http.Request) (lat, lon float64, err error) {

@@ -1,10 +1,18 @@
 # Klaus Field Log
 
 Internal field-operations tool for a landscaping company: workers punch in/out
-from a phone, admins review and correct time entries over LAN/WireGuard.
+from a phone, submit job invoices, and admins review time entries and invoices
+over LAN/WireGuard.
 
-Go + SQLite, no external services. See `refactor.md` for the stack rationale
-and `time_reporting_plan.md` for the feature design.
+Go + SQLite. See `refactor.md` for the stack rationale and
+`time_reporting_plan.md` for the feature design.
+
+## Requirements
+
+- **Go 1.22+**
+- **msmtp** — used to email approved invoices to `mylawncut@aol.com`. Must be
+  installed and configured at `/etc/msmtprc` on the server before the invoice
+  submit button will deliver email. Install: `sudo apt install msmtp`.
 
 ## Quick Start
 
@@ -40,12 +48,13 @@ to start fresh.
 ## Run it
 
 ```
-go run ./cmd/web
+go run ./cmd/web      # worker punch site (:4000) + admin site (:8082)
+go run ./cmd/invoice  # invoice submission site (:8083)
 ```
 
 - Worker punch site: http://localhost:4000/punch
-- Admin site: http://localhost:8082/admin (bound to all interfaces — reachable
-  over LAN and WireGuard, not just localhost)
+- Admin site: http://localhost:8082/admin (all interfaces — LAN/WireGuard)
+- Invoice site: http://localhost:8083 (all interfaces — LAN/WireGuard only)
 
 SQLite migrations run automatically on startup. The database file
 (`db/klapp.db`) is created on first run and is gitignored.

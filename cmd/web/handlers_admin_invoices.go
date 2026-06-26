@@ -85,8 +85,6 @@ func (app *application) adminInvoiceSubmit(w http.ResponseWriter, r *http.Reques
 	http.Redirect(w, r, fmt.Sprintf("/admin/invoices/%d", id), http.StatusSeeOther)
 }
 
-// sendInvoiceEmail sends the invoice to mylawncut@aol.com via msmtp.
-// See todo.md for msmtp setup instructions.
 func sendInvoiceEmail(inv *models.Invoice) error {
 	subject := fmt.Sprintf("Invoice #%d — %s, House %s (%s)", inv.ID, inv.CustomerName, inv.HouseNumber, inv.Date)
 	var body strings.Builder
@@ -115,7 +113,7 @@ func sendInvoiceEmail(inv *models.Invoice) error {
 
 	msg := "To: mylawncut@aol.com\nSubject: " + subject + "\n\n" + body.String()
 
-	cmd := exec.Command("msmtp", "--account=default", "mylawncut@aol.com")
+	cmd := exec.Command("msmtp", "--config=/etc/msmtprc", "--account=default", "mylawncut@aol.com")
 	cmd.Stdin = strings.NewReader(msg)
 	return cmd.Run()
 }

@@ -3,7 +3,7 @@
 ## High Priority
 - ~~Add new hourly salary column for worker.~~ Done.
 - ~~Add new column with language of worker.~~ Done.
-- Set up msmtp for invoice email delivery (see below).
+- ~~Set up msmtp for invoice email delivery.~~ Done — config at `/etc/msmtprc`.
 
 ### msmtp setup (for invoice email to mylawncut@aol.com)
 The invoice "Submit" button calls `msmtp --account=default mylawncut@aol.com`.

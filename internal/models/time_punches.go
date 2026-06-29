@@ -277,7 +277,18 @@ func (m *TimePunchModel) PunchOutLate(workerID int, endTime time.Time) error {
 // admin. A zero endTime clears it back to open (still punched in).
 // day and pay_period are recalculated from startTime so moving a punch
 // across a day boundary is reflected correctly.
+//
+// Any other punch for the same worker whose time range overlaps the new
+// range is deleted in the same transaction, so an edit that moves a punch
+// onto a day that already has an entry replaces that entry rather than
+// producing a duplicate.
 func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	var end any
 	if !endTime.IsZero() {
 		end = endTime.UTC().Format(time.RFC3339)
@@ -286,12 +297,14 @@ func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error
 	day := startTime.Local().Format("2006-01-02")
 	payPeriod := payPeriodStart(startTime.Local()).Format("2006-01-02")
 
-	stmt := `UPDATE time_punches SET start_time = ?, end_time = ?, day = ?, pay_period = ?, modified_by_admin = TRUE WHERE id = ?`
-	result, err := m.DB.Exec(stmt, startTime.UTC().Format(time.RFC3339), end, day, payPeriod, id)
+	result, err := tx.Exec(`
+		UPDATE time_punches
+		SET start_time = ?, end_time = ?, day = ?, pay_period = ?, modified_by_admin = TRUE
+		WHERE id = ?`,
+		startTime.UTC().Format(time.RFC3339), end, day, payPeriod, id)
 	if err != nil {
 		return err
 	}
-
 	n, err := result.RowsAffected()
 	if err != nil {
 		return err
@@ -300,7 +313,22 @@ func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error
 		return ErrNoRecord
 	}
 
-	return nil
+	// Delete any other punch for the same worker that overlaps [startTime, endTime].
+	// Overlap condition: existing.start < new.end (or new.end is null → open)
+	//                AND (existing.end IS NULL OR existing.end > new.start)
+	newStart := startTime.UTC().Format(time.RFC3339)
+	_, err = tx.Exec(`
+		DELETE FROM time_punches
+		WHERE id != ?
+		  AND worker_id = (SELECT worker_id FROM time_punches WHERE id = ?)
+		  AND (? IS NULL OR start_time < ?)
+		  AND (end_time IS NULL OR end_time > ?)`,
+		id, id, end, end, newStart)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // DashboardStatus reports every active worker's punch status for the

@@ -266,6 +266,92 @@ func TestAdminUpdate(t *testing.T) {
 	}
 }
 
+func TestAdminUpdateRemovesConflictingPunch(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Thomas", "9999", true)
+
+	friday := time.Date(2026, 6, 19, 7, 0, 0, 0, time.Local)
+	saturday := time.Date(2026, 6, 20, 8, 0, 0, 0, time.Local)
+
+	// Existing Friday punch (correct day, already in DB).
+	fridayID, err := tm.PunchIn(workerID, 0, 0, friday)
+	if err != nil {
+		t.Fatalf("PunchIn Friday: %v", err)
+	}
+	if err := tm.PunchOut(workerID, 0, 0, friday.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchOut Friday: %v", err)
+	}
+
+	// Saturday punch that the admin is moving to Friday (worker forgot to punch Friday).
+	saturdayID, err := tm.PunchIn(workerID, 0, 0, saturday)
+	if err != nil {
+		t.Fatalf("PunchIn Saturday: %v", err)
+	}
+	if err := tm.PunchOut(workerID, 0, 0, saturday.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchOut Saturday: %v", err)
+	}
+
+	// Edit the Saturday punch → move it to Friday; it now overlaps the existing Friday entry.
+	correctedStart := time.Date(2026, 6, 19, 8, 30, 0, 0, time.Local)
+	correctedEnd := correctedStart.Add(8 * time.Hour)
+	if err := tm.AdminUpdate(saturdayID, correctedStart, correctedEnd); err != nil {
+		t.Fatalf("AdminUpdate: %v", err)
+	}
+
+	// The old Friday punch should be gone — replaced by the edited one.
+	if _, err := tm.Get(fridayID); !errors.Is(err, ErrNoRecord) {
+		t.Errorf("old Friday punch: got %v, want ErrNoRecord (should have been replaced)", err)
+	}
+
+	// The edited punch should still exist with the new times.
+	p, err := tm.Get(saturdayID)
+	if err != nil {
+		t.Fatalf("Get edited punch: %v", err)
+	}
+	if p.Day != "2026-06-19" {
+		t.Errorf("day = %q, want 2026-06-19", p.Day)
+	}
+}
+
+func TestAdminUpdateDoesNotRemoveNonOverlappingPunch(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Thomas", "9999", true)
+
+	// Two punches on different days with no time overlap.
+	friday := time.Date(2026, 6, 19, 7, 0, 0, 0, time.Local)
+	saturday := time.Date(2026, 6, 20, 8, 0, 0, 0, time.Local)
+
+	fridayID, err := tm.PunchIn(workerID, 0, 0, friday)
+	if err != nil {
+		t.Fatalf("PunchIn Friday: %v", err)
+	}
+	if err := tm.PunchOut(workerID, 0, 0, friday.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchOut Friday: %v", err)
+	}
+
+	saturdayID, err := tm.PunchIn(workerID, 0, 0, saturday)
+	if err != nil {
+		t.Fatalf("PunchIn Saturday: %v", err)
+	}
+	if err := tm.PunchOut(workerID, 0, 0, saturday.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchOut Saturday: %v", err)
+	}
+
+	// Edit Saturday's start/end time but keep it on Saturday — no overlap with Friday.
+	correctedStart := saturday.Add(30 * time.Minute)
+	correctedEnd := correctedStart.Add(7 * time.Hour)
+	if err := tm.AdminUpdate(saturdayID, correctedStart, correctedEnd); err != nil {
+		t.Fatalf("AdminUpdate: %v", err)
+	}
+
+	// Friday punch must still be there.
+	if _, err := tm.Get(fridayID); err != nil {
+		t.Errorf("Friday punch should still exist after editing Saturday: %v", err)
+	}
+}
+
 func TestAdminUpdateRecomputesDayAndPayPeriod(t *testing.T) {
 	db := newTestDB(t)
 	tm := &TimePunchModel{DB: db}

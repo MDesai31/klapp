@@ -13,6 +13,14 @@ func (app *application) punchForm(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Spanish: true})
 }
 
+func (app *application) privacyPolicy(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, http.StatusOK, "privacy.tmpl", templateData{})
+}
+
+func (app *application) termsAndConditions(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, http.StatusOK, "terms.tmpl", templateData{})
+}
+
 // punchStatus identifies the worker by PIN and shows whether they're
 // currently punched in.
 func (app *application) punchStatus(w http.ResponseWriter, r *http.Request) {

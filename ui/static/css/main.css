@@ -90,3 +90,19 @@ tr.not-in {
 tr.unreviewed {
     background: #fff3cd;
 }
+
+tr.non-compliant {
+    background: #fde8e8;
+    font-weight: bold;
+}
+
+.btn-delete {
+    width: auto;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.8rem;
+    background: none;
+    border: 1px solid #c0342c;
+    color: #c0342c;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}

@@ -1,0 +1,25 @@
+{{define "title"}}Add Entry{{end}}
+
+{{define "main"}}
+{{template "nav" .}}
+
+<h1>Add Timesheet Entry</h1>
+<form action="/admin/punches/new" method="POST">
+    <label for="worker_id">Worker</label>
+    <select id="worker_id" name="worker_id" required>
+        <option value="">-- select --</option>
+        {{range .Workers}}
+        <option value="{{.ID}}">{{.WorkerName}}{{if not .Active}} (inactive){{end}}</option>
+        {{end}}
+    </select>
+
+    <label for="start_time">Start</label>
+    <input type="datetime-local" id="start_time" name="start_time" required>
+
+    <label for="end_time">End (leave blank if still punched in)</label>
+    <input type="datetime-local" id="end_time" name="end_time">
+
+    <button type="submit">Add Entry</button>
+</form>
+<p><a href="/admin/timesheet">← Back to Timesheet</a></p>
+{{end}}

@@ -82,8 +82,29 @@ func main() {
 		errc <- http.ListenAndServe(*adminAddr, app.adminRoutes())
 	}()
 
+	go app.runNightlyPunchOut()
+
 	logger.Error((<-errc).Error())
 	os.Exit(1)
+}
+
+// runNightlyPunchOut sleeps until 9 PM each day, then auto-closes any
+// punch still open and marks it non_compliant.
+func (app *application) runNightlyPunchOut() {
+	for {
+		now := time.Now().Local()
+		next := time.Date(now.Year(), now.Month(), now.Day(), 21, 0, 0, 0, time.Local)
+		if !now.Before(next) {
+			next = next.AddDate(0, 0, 1)
+		}
+		time.Sleep(time.Until(next))
+		n, err := app.timePunches.AutoPunchOutNonCompliant(next)
+		if err != nil {
+			app.logger.Error("auto punch-out failed", slog.Any("err", err))
+		} else if n > 0 {
+			app.logger.Info("auto punch-out complete", slog.Int("workers", n))
+		}
+	}
 }
 
 func openDB(dsn string) (*sql.DB, error) {

@@ -9,6 +9,75 @@ import (
 	"klapp/internal/models"
 )
 
+func (app *application) adminDeletePunch(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	punch, err := app.timePunches.Get(id)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			app.clientError(w, http.StatusNotFound)
+			return
+		}
+		app.serverError(w, r, err)
+		return
+	}
+	payPeriod := punch.PayPeriod
+
+	if err := app.timePunches.Delete(id); err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			app.clientError(w, http.StatusNotFound)
+			return
+		}
+		app.serverError(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/timesheet?period="+payPeriod, http.StatusSeeOther)
+}
+
+func (app *application) adminAddPunchForm(w http.ResponseWriter, r *http.Request) {
+	workers, err := app.workers.List()
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	app.render(w, r, http.StatusOK, "admin_add_punch.tmpl", templateData{Workers: workers})
+}
+
+func (app *application) adminAddPunch(w http.ResponseWriter, r *http.Request) {
+	workerID, err := strconv.Atoi(r.PostFormValue("worker_id"))
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	start, err := time.ParseInLocation("2006-01-02T15:04", r.PostFormValue("start_time"), time.Local)
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	var end time.Time
+	if v := r.PostFormValue("end_time"); v != "" {
+		end, err = time.ParseInLocation("2006-01-02T15:04", v, time.Local)
+		if err != nil {
+			app.clientError(w, http.StatusBadRequest)
+			return
+		}
+	}
+
+	if _, err := app.timePunches.AdminCreate(workerID, start, end); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/timesheet?period="+models.CurrentPayPeriod(start), http.StatusSeeOther)
+}
+
 func (app *application) adminTimesheet(w http.ResponseWriter, r *http.Request) {
 	period := r.URL.Query().Get("period")
 	if period == "" {

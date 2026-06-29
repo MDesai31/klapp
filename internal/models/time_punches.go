@@ -20,6 +20,7 @@ type TimePunch struct {
 	EndLon          sql.NullFloat64
 	Late            bool
 	ModifiedByAdmin bool
+	NonCompliant    bool
 }
 
 // TimesheetRow is a punch joined with the worker's name, for admin views.
@@ -156,7 +157,7 @@ func scanTimePunch(row scanner) (TimePunch, error) {
 	var start string
 
 	err := row.Scan(&p.ID, &p.WorkerID, &p.PayPeriod, &p.Day, &start, &p.EndTime,
-		&p.StartLat, &p.StartLon, &p.EndLat, &p.EndLon, &p.Late, &p.ModifiedByAdmin)
+		&p.StartLat, &p.StartLon, &p.EndLat, &p.EndLon, &p.Late, &p.ModifiedByAdmin, &p.NonCompliant)
 	if err != nil {
 		return TimePunch{}, err
 	}
@@ -170,7 +171,7 @@ func scanTimePunch(row scanner) (TimePunch, error) {
 }
 
 const timePunchColumns = `id, worker_id, pay_period, day, start_time, end_time,
-	start_lat, start_lon, end_lat, end_lon, late, modified_by_admin`
+	start_lat, start_lon, end_lat, end_lon, late, modified_by_admin, non_compliant`
 
 // Open returns the worker's punch that has no end_time yet, if any.
 func (m *TimePunchModel) Open(workerID int) (TimePunch, error) {
@@ -274,14 +275,19 @@ func (m *TimePunchModel) PunchOutLate(workerID int, endTime time.Time) error {
 
 // AdminUpdate overwrites a punch's start/end time as corrected by an
 // admin. A zero endTime clears it back to open (still punched in).
+// day and pay_period are recalculated from startTime so moving a punch
+// across a day boundary is reflected correctly.
 func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error {
 	var end any
 	if !endTime.IsZero() {
 		end = endTime.UTC().Format(time.RFC3339)
 	}
 
-	stmt := `UPDATE time_punches SET start_time = ?, end_time = ?, modified_by_admin = TRUE WHERE id = ?`
-	result, err := m.DB.Exec(stmt, startTime.UTC().Format(time.RFC3339), end, id)
+	day := startTime.Local().Format("2006-01-02")
+	payPeriod := payPeriodStart(startTime.Local()).Format("2006-01-02")
+
+	stmt := `UPDATE time_punches SET start_time = ?, end_time = ?, day = ?, pay_period = ?, modified_by_admin = TRUE WHERE id = ?`
+	result, err := m.DB.Exec(stmt, startTime.UTC().Format(time.RFC3339), end, day, payPeriod, id)
 	if err != nil {
 		return err
 	}
@@ -326,13 +332,14 @@ func (m *TimePunchModel) DashboardStatus(day string) ([]DashboardRow, error) {
 
 // ForPayPeriod lists every punch in the given pay period (its start date,
 // "2006-01-02"), across all workers, for the admin timesheet.
+// Non-compliant punches sort first so they appear at the top.
 func (m *TimePunchModel) ForPayPeriod(payPeriod string) ([]TimesheetRow, error) {
 	stmt := `SELECT tp.id, tp.worker_id, w.worker_name, tp.pay_period, tp.day, tp.start_time, tp.end_time,
-		tp.start_lat, tp.start_lon, tp.end_lat, tp.end_lon, tp.late, tp.modified_by_admin
+		tp.start_lat, tp.start_lon, tp.end_lat, tp.end_lon, tp.late, tp.modified_by_admin, tp.non_compliant
 		FROM time_punches tp
 		JOIN workers w ON w.id = tp.worker_id
 		WHERE tp.pay_period = ?
-		ORDER BY tp.day, w.worker_name`
+		ORDER BY tp.non_compliant DESC, tp.day, w.worker_name`
 
 	rows, err := m.DB.Query(stmt, payPeriod)
 	if err != nil {
@@ -345,7 +352,7 @@ func (m *TimePunchModel) ForPayPeriod(payPeriod string) ([]TimesheetRow, error) 
 		var r TimesheetRow
 		var start string
 		err := rows.Scan(&r.ID, &r.WorkerID, &r.WorkerName, &r.PayPeriod, &r.Day, &start, &r.EndTime,
-			&r.StartLat, &r.StartLon, &r.EndLat, &r.EndLon, &r.Late, &r.ModifiedByAdmin)
+			&r.StartLat, &r.StartLon, &r.EndLat, &r.EndLon, &r.Late, &r.ModifiedByAdmin, &r.NonCompliant)
 		if err != nil {
 			return nil, err
 		}
@@ -509,4 +516,58 @@ func (m *TimePunchModel) PayPeriodSummary(payPeriod string) ([]PayPeriodSummaryR
 		out[i] = *byWorker[id]
 	}
 	return out, nil
+}
+
+// AutoPunchOutNonCompliant closes every open punch whose start_time is
+// before cutoff, sets non_compliant = TRUE, and returns the number of rows
+// updated. Called nightly at 9 PM.
+func (m *TimePunchModel) AutoPunchOutNonCompliant(cutoff time.Time) (int, error) {
+	cutoffStr := cutoff.UTC().Format(time.RFC3339)
+	result, err := m.DB.Exec(`
+		UPDATE time_punches SET end_time = ?, non_compliant = TRUE
+		WHERE end_time IS NULL AND start_time < ?`,
+		cutoffStr, cutoffStr)
+	if err != nil {
+		return 0, err
+	}
+	n, err := result.RowsAffected()
+	return int(n), err
+}
+
+// Delete removes a punch by ID. ErrNoRecord if it doesn't exist.
+func (m *TimePunchModel) Delete(id int) error {
+	result, err := m.DB.Exec(`DELETE FROM time_punches WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNoRecord
+	}
+	return nil
+}
+
+// AdminCreate inserts a new punch on behalf of an admin (no GPS coords).
+// A zero endTime leaves the punch open.
+func (m *TimePunchModel) AdminCreate(workerID int, startTime, endTime time.Time) (int, error) {
+	day := startTime.Local().Format("2006-01-02")
+	payPeriod := payPeriodStart(startTime.Local()).Format("2006-01-02")
+
+	var end any
+	if !endTime.IsZero() {
+		end = endTime.UTC().Format(time.RFC3339)
+	}
+
+	stmt := `INSERT INTO time_punches
+		(worker_id, pay_period, day, start_time, end_time, start_lat, start_lon, modified_by_admin)
+		VALUES (?, ?, ?, ?, ?, 0, 0, TRUE)`
+	result, err := m.DB.Exec(stmt, workerID, payPeriod, day, startTime.UTC().Format(time.RFC3339), end)
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	return int(id), err
 }

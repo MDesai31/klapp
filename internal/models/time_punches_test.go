@@ -266,6 +266,234 @@ func TestAdminUpdate(t *testing.T) {
 	}
 }
 
+func TestAdminUpdateRecomputesDayAndPayPeriod(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Thomas", "9999", true)
+
+	// Punch in on Saturday (2026-06-20, last day of period 1)
+	saturday := time.Date(2026, 6, 20, 8, 0, 0, 0, time.Local)
+	id, err := tm.PunchIn(workerID, 0, 0, saturday)
+	if err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+	p, err := tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if p.Day != "2026-06-20" {
+		t.Fatalf("initial day = %q, want 2026-06-20", p.Day)
+	}
+
+	// Edit to Friday — should move the record to a different day
+	friday := time.Date(2026, 6, 19, 8, 0, 0, 0, time.Local)
+	if err := tm.AdminUpdate(id, friday, friday.Add(8*time.Hour)); err != nil {
+		t.Fatalf("AdminUpdate: %v", err)
+	}
+
+	p, err = tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get after update: %v", err)
+	}
+	if p.Day != "2026-06-19" {
+		t.Errorf("day = %q, want 2026-06-19 (Friday)", p.Day)
+	}
+	if p.PayPeriod != payPeriodAnchor.Format("2006-01-02") {
+		t.Errorf("pay_period = %q, want %q", p.PayPeriod, payPeriodAnchor.Format("2006-01-02"))
+	}
+}
+
+func TestAdminUpdateCrossesPayPeriodBoundary(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Thomas", "9999", true)
+
+	// Punch in on the first day of period 2 (2026-06-22)
+	period2Start := time.Date(2026, 6, 22, 8, 0, 0, 0, time.Local)
+	id, err := tm.PunchIn(workerID, 0, 0, period2Start)
+	if err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	// Edit back to the last day of period 1 (2026-06-21)
+	period1LastDay := time.Date(2026, 6, 21, 8, 0, 0, 0, time.Local)
+	if err := tm.AdminUpdate(id, period1LastDay, period1LastDay.Add(8*time.Hour)); err != nil {
+		t.Fatalf("AdminUpdate: %v", err)
+	}
+
+	p, err := tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get after update: %v", err)
+	}
+	if p.Day != "2026-06-21" {
+		t.Errorf("day = %q, want 2026-06-21", p.Day)
+	}
+	wantPeriod := payPeriodAnchor.Format("2006-01-02") // 2026-06-08
+	if p.PayPeriod != wantPeriod {
+		t.Errorf("pay_period = %q, want %q", p.PayPeriod, wantPeriod)
+	}
+}
+
+func TestAdminCreate(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "6666", true)
+
+	// Closed punch
+	start := time.Date(2026, 6, 19, 8, 0, 0, 0, time.Local)
+	end := start.Add(8 * time.Hour)
+	id, err := tm.AdminCreate(workerID, start, end)
+	if err != nil {
+		t.Fatalf("AdminCreate: %v", err)
+	}
+	p, err := tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if p.Day != "2026-06-19" {
+		t.Errorf("day = %q, want 2026-06-19", p.Day)
+	}
+	if p.PayPeriod != payPeriodAnchor.Format("2006-01-02") {
+		t.Errorf("pay_period = %q, want %q", p.PayPeriod, payPeriodAnchor.Format("2006-01-02"))
+	}
+	if !p.ModifiedByAdmin {
+		t.Error("want modified_by_admin = true")
+	}
+	if !p.EndTime.Valid {
+		t.Error("want end_time to be set")
+	}
+
+	// Open punch (no end time)
+	idOpen, err := tm.AdminCreate(workerID, start.AddDate(0, 0, 1), time.Time{})
+	if err != nil {
+		t.Fatalf("AdminCreate open: %v", err)
+	}
+	pOpen, err := tm.Get(idOpen)
+	if err != nil {
+		t.Fatalf("Get open: %v", err)
+	}
+	if pOpen.EndTime.Valid {
+		t.Error("want open punch to have no end_time")
+	}
+}
+
+func TestDelete(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "5555", true)
+
+	id, err := tm.PunchIn(workerID, 0, 0, time.Now())
+	if err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	if err := tm.Delete(id); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := tm.Get(id); !errors.Is(err, ErrNoRecord) {
+		t.Errorf("Get after delete: got %v, want ErrNoRecord", err)
+	}
+	if err := tm.Delete(id); !errors.Is(err, ErrNoRecord) {
+		t.Errorf("Delete non-existent: got %v, want ErrNoRecord", err)
+	}
+}
+
+func TestAutoPunchOutNonCompliant(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+
+	alice := mustInsertWorker(t, db, "Alice", "1111", true)
+	bob := mustInsertWorker(t, db, "Bob", "2222", true)
+	carlos := mustInsertWorker(t, db, "Carlos", "3333", true)
+
+	day := time.Date(2026, 6, 17, 0, 0, 0, 0, time.Local)
+	cutoff := time.Date(2026, 6, 17, 21, 0, 0, 0, time.Local)
+
+	if _, err := tm.PunchIn(alice, 0, 0, day.Add(7*time.Hour)); err != nil {
+		t.Fatalf("PunchIn Alice: %v", err)
+	}
+	if _, err := tm.PunchIn(bob, 0, 0, day.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchIn Bob: %v", err)
+	}
+	if _, err := tm.PunchIn(carlos, 0, 0, day.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchIn Carlos: %v", err)
+	}
+	if err := tm.PunchOut(carlos, 0, 0, day.Add(17*time.Hour)); err != nil {
+		t.Fatalf("PunchOut Carlos: %v", err)
+	}
+
+	n, err := tm.AutoPunchOutNonCompliant(cutoff)
+	if err != nil {
+		t.Fatalf("AutoPunchOutNonCompliant: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("closed %d punches, want 2", n)
+	}
+
+	for _, workerID := range []int{alice, bob} {
+		var closed, nc bool
+		err := db.QueryRow(`SELECT end_time IS NOT NULL, non_compliant FROM time_punches WHERE worker_id = ?`, workerID).Scan(&closed, &nc)
+		if err != nil {
+			t.Fatalf("query worker %d: %v", workerID, err)
+		}
+		if !closed {
+			t.Errorf("worker %d: want punch closed", workerID)
+		}
+		if !nc {
+			t.Errorf("worker %d: want non_compliant = true", workerID)
+		}
+	}
+
+	var nc bool
+	if err := db.QueryRow(`SELECT non_compliant FROM time_punches WHERE worker_id = ?`, carlos).Scan(&nc); err != nil {
+		t.Fatalf("query Carlos: %v", err)
+	}
+	if nc {
+		t.Error("Carlos: want non_compliant = false (closed normally)")
+	}
+}
+
+func TestForPayPeriodNonCompliantOrdering(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "7777", true)
+
+	day1 := payPeriodAnchor.Add(8 * time.Hour)
+	day2 := payPeriodAnchor.AddDate(0, 0, 1).Add(8 * time.Hour)
+
+	// Normal punch on day1
+	if _, err := tm.PunchIn(workerID, 0, 0, day1); err != nil {
+		t.Fatalf("PunchIn day1: %v", err)
+	}
+	if err := tm.PunchOut(workerID, 0, 0, day1.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchOut day1: %v", err)
+	}
+
+	// Non-compliant punch on day2
+	if _, err := tm.PunchIn(workerID, 0, 0, day2); err != nil {
+		t.Fatalf("PunchIn day2: %v", err)
+	}
+	cutoff := time.Date(day2.Year(), day2.Month(), day2.Day(), 21, 0, 0, 0, time.Local)
+	if _, err := tm.AutoPunchOutNonCompliant(cutoff); err != nil {
+		t.Fatalf("AutoPunchOutNonCompliant: %v", err)
+	}
+
+	rows, err := tm.ForPayPeriod(payPeriodAnchor.Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("ForPayPeriod: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("got %d rows, want 2", len(rows))
+	}
+	// Non-compliant (day2) should sort first despite being a later date
+	if !rows[0].NonCompliant {
+		t.Errorf("rows[0].NonCompliant = false, want true (non-compliant should sort first)")
+	}
+	if rows[1].NonCompliant {
+		t.Errorf("rows[1].NonCompliant = true, want false")
+	}
+}
+
 func TestPayPeriodDays(t *testing.T) {
 	days, err := PayPeriodDays("2026-06-08")
 	if err != nil {

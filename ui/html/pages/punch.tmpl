@@ -56,11 +56,19 @@
         button.textContent = form.action.endsWith("/out") ? "Punch Out" : "Punch In";
         {{end}}
     }, function () {
+        {{if .Worker.RequireLocation}}
+        {{if .Spanish}}
+        button.textContent = "Se requiere ubicación — permite el acceso en tu navegador";
+        {{else}}
+        button.textContent = "Location required — please allow it in your browser";
+        {{end}}
+        {{else}}
         button.disabled = false;
         {{if .Spanish}}
-        button.textContent = "Ubicación no disponible - intenta de nuevo";
+        button.textContent = form.action.endsWith("/out") ? "Registrar Salida" : "Registrar Entrada";
         {{else}}
-        button.textContent = "Location unavailable - try again";
+        button.textContent = form.action.endsWith("/out") ? "Punch Out" : "Punch In";
+        {{end}}
         {{end}}
     });
 })();

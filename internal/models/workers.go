@@ -6,13 +6,14 @@ import (
 )
 
 type Worker struct {
-	ID          int
-	WorkerName  string
-	PIN         string
-	Phone       string
-	HourlyRate  float64
-	Language    string // "spanish" or "english"
-	Active      bool
+	ID              int
+	WorkerName      string
+	PIN             string
+	Phone           string
+	HourlyRate      float64
+	Language        string // "spanish" or "english"
+	Active          bool
+	RequireLocation bool
 }
 
 type WorkerModel struct {
@@ -26,7 +27,7 @@ type WorkerModel struct {
 // to look one up for a worker who forgot it. Fine at the expected scale
 // (~15 workers).
 func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
-	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone, hourly_rate, language FROM workers WHERE active = TRUE`)
+	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone, hourly_rate, language, require_location FROM workers WHERE active = TRUE`)
 	if err != nil {
 		return Worker{}, err
 	}
@@ -34,7 +35,7 @@ func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
 
 	for rows.Next() {
 		var w Worker
-		if err := rows.Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.HourlyRate, &w.Language); err != nil {
+		if err := rows.Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.HourlyRate, &w.Language, &w.RequireLocation); err != nil {
 			return Worker{}, err
 		}
 		if w.PIN == pin {
@@ -50,10 +51,10 @@ func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
 }
 
 func (m *WorkerModel) Get(id int) (Worker, error) {
-	stmt := `SELECT id, worker_name, pin, phone, hourly_rate, language, active FROM workers WHERE id = ?`
+	stmt := `SELECT id, worker_name, pin, phone, hourly_rate, language, active, require_location FROM workers WHERE id = ?`
 
 	var w Worker
-	err := m.DB.QueryRow(stmt, id).Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.HourlyRate, &w.Language, &w.Active)
+	err := m.DB.QueryRow(stmt, id).Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.HourlyRate, &w.Language, &w.Active, &w.RequireLocation)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Worker{}, ErrNoRecord
@@ -67,7 +68,7 @@ func (m *WorkerModel) Get(id int) (Worker, error) {
 // List returns every worker, active or not, for the admin worker
 // management page.
 func (m *WorkerModel) List() ([]Worker, error) {
-	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone, hourly_rate, language, active FROM workers ORDER BY worker_name`)
+	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone, hourly_rate, language, active, require_location FROM workers ORDER BY worker_name`)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ func (m *WorkerModel) List() ([]Worker, error) {
 	var out []Worker
 	for rows.Next() {
 		var w Worker
-		if err := rows.Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.HourlyRate, &w.Language, &w.Active); err != nil {
+		if err := rows.Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.HourlyRate, &w.Language, &w.Active, &w.RequireLocation); err != nil {
 			return nil, err
 		}
 		out = append(out, w)
@@ -85,10 +86,10 @@ func (m *WorkerModel) List() ([]Worker, error) {
 	return out, rows.Err()
 }
 
-// Update changes a worker's name, PIN, and phone. Active status is changed
-// separately via SetActive. Returns ErrDuplicatePIN if another worker
-// (active or not) already has that PIN.
-func (m *WorkerModel) Update(id int, name, pin, phone string, hourlyRate float64, language string) error {
+// Update changes a worker's name, PIN, phone, and location requirement. Active
+// status is changed separately via SetActive. Returns ErrDuplicatePIN if
+// another worker (active or not) already has that PIN.
+func (m *WorkerModel) Update(id int, name, pin, phone string, hourlyRate float64, language string, requireLocation bool) error {
 	inUse, err := m.pinInUse(pin, id)
 	if err != nil {
 		return err
@@ -97,7 +98,7 @@ func (m *WorkerModel) Update(id int, name, pin, phone string, hourlyRate float64
 		return ErrDuplicatePIN
 	}
 
-	result, err := m.DB.Exec(`UPDATE workers SET worker_name = ?, pin = ?, phone = ?, hourly_rate = ?, language = ? WHERE id = ?`, name, pin, phone, hourlyRate, language, id)
+	result, err := m.DB.Exec(`UPDATE workers SET worker_name = ?, pin = ?, phone = ?, hourly_rate = ?, language = ?, require_location = ? WHERE id = ?`, name, pin, phone, hourlyRate, language, requireLocation, id)
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func (m *WorkerModel) Update(id int, name, pin, phone string, hourlyRate float64
 
 // Create adds a new worker. Returns ErrDuplicatePIN if another worker
 // (active or not) already has that PIN.
-func (m *WorkerModel) Create(name, pin, phone string, hourlyRate float64, language string) (int, error) {
+func (m *WorkerModel) Create(name, pin, phone string, hourlyRate float64, language string, requireLocation bool) (int, error) {
 	inUse, err := m.pinInUse(pin, 0)
 	if err != nil {
 		return 0, err
@@ -124,8 +125,8 @@ func (m *WorkerModel) Create(name, pin, phone string, hourlyRate float64, langua
 		return 0, ErrDuplicatePIN
 	}
 
-	stmt := `INSERT INTO workers (worker_name, pin, phone, hourly_rate, language, active) VALUES (?, ?, ?, ?, ?, TRUE)`
-	result, err := m.DB.Exec(stmt, name, pin, phone, hourlyRate, language)
+	stmt := `INSERT INTO workers (worker_name, pin, phone, hourly_rate, language, active, require_location) VALUES (?, ?, ?, ?, ?, TRUE, ?)`
+	result, err := m.DB.Exec(stmt, name, pin, phone, hourlyRate, language, requireLocation)
 	if err != nil {
 		return 0, err
 	}

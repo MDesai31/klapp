@@ -59,13 +59,14 @@ func (app *application) adminCreateWorker(w http.ResponseWriter, r *http.Request
 	phone := r.PostFormValue("phone")
 	hourlyRate := parseHourlyRate(r.PostFormValue("hourly_rate"))
 	language := parseLanguage(r.PostFormValue("language"))
+	requireLocation := r.PostFormValue("require_location") == "on"
 
 	if name == "" || pin == "" {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 
-	if _, err := app.workers.Create(name, pin, phone, hourlyRate, language); err != nil {
+	if _, err := app.workers.Create(name, pin, phone, hourlyRate, language, requireLocation); err != nil {
 		if errors.Is(err, models.ErrDuplicatePIN) {
 			workers, err := app.workers.List()
 			if err != nil {
@@ -117,19 +118,20 @@ func (app *application) adminEditWorker(w http.ResponseWriter, r *http.Request) 
 	phone := r.PostFormValue("phone")
 	hourlyRate := parseHourlyRate(r.PostFormValue("hourly_rate"))
 	language := parseLanguage(r.PostFormValue("language"))
+	requireLocation := r.PostFormValue("require_location") == "on"
 
 	if name == "" || pin == "" {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 
-	if err := app.workers.Update(id, name, pin, phone, hourlyRate, language); err != nil {
+	if err := app.workers.Update(id, name, pin, phone, hourlyRate, language, requireLocation); err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
 			app.clientError(w, http.StatusNotFound)
 			return
 		}
 		if errors.Is(err, models.ErrDuplicatePIN) {
-			worker := models.Worker{ID: id, WorkerName: name, PIN: pin, Phone: phone, HourlyRate: hourlyRate, Language: language}
+			worker := models.Worker{ID: id, WorkerName: name, PIN: pin, Phone: phone, HourlyRate: hourlyRate, Language: language, RequireLocation: requireLocation}
 			app.render(w, r, http.StatusOK, "admin_edit_worker.tmpl", templateData{
 				Worker: &worker,
 				Flash:  "That PIN is already in use by another worker.",

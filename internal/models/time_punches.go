@@ -14,8 +14,8 @@ type TimePunch struct {
 	Day             string
 	StartTime       time.Time
 	EndTime         sql.NullString // RFC3339 string; empty/invalid until punched out
-	StartLat        float64
-	StartLon        float64
+	StartLat        sql.NullFloat64
+	StartLon        sql.NullFloat64
 	EndLat          sql.NullFloat64
 	EndLon          sql.NullFloat64
 	Late            bool
@@ -205,7 +205,7 @@ func (m *TimePunchModel) Get(id int) (TimePunch, error) {
 
 // PunchIn records a new punch-in. It refuses to create one if the worker
 // already has an open punch.
-func (m *TimePunchModel) PunchIn(workerID int, lat, lon float64, now time.Time) (int, error) {
+func (m *TimePunchModel) PunchIn(workerID int, lat, lon *float64, now time.Time) (int, error) {
 	if _, err := m.Open(workerID); err == nil {
 		return 0, ErrAlreadyOpen
 	} else if !errors.Is(err, ErrNoRecord) {
@@ -232,7 +232,7 @@ func (m *TimePunchModel) PunchIn(workerID int, lat, lon float64, now time.Time) 
 
 // PunchOut closes the worker's open punch. ErrNoRecord means there was
 // nothing open to close.
-func (m *TimePunchModel) PunchOut(workerID int, lat, lon float64, now time.Time) error {
+func (m *TimePunchModel) PunchOut(workerID int, lat, lon *float64, now time.Time) error {
 	stmt := `UPDATE time_punches SET end_time = ?, end_lat = ?, end_lon = ?
 		WHERE worker_id = ? AND end_time IS NULL`
 	result, err := m.DB.Exec(stmt, now.UTC().Format(time.RFC3339), lat, lon, workerID)

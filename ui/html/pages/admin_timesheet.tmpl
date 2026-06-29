@@ -23,7 +23,7 @@
     <td>{{if .ModifiedByAdmin}}yes{{end}}</td>
     <td>{{if .NonCompliant}}yes{{end}}</td>
     <td>
-        <a href="{{printf "https://www.google.com/maps?q=%v,%v" .StartLat .StartLon}}" target="_blank">in</a>
+        {{if .StartLat.Valid}}<a href="{{printf "https://www.google.com/maps?q=%v,%v" .StartLat.Float64 .StartLon.Float64}}" target="_blank">in</a>{{else}}in{{end}}
         {{if .EndLat.Valid}} / <a href="{{printf "https://www.google.com/maps?q=%v,%v" .EndLat.Float64 .EndLon.Float64}}" target="_blank">out</a>{{end}}
     </td>
     <td>

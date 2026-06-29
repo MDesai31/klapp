@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+func fptr(f float64) *float64 { return &f }
+
 func TestPunchInAndOut(t *testing.T) {
 	db := newTestDB(t)
 	tm := &TimePunchModel{DB: db}
@@ -15,7 +17,7 @@ func TestPunchInAndOut(t *testing.T) {
 
 	now := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
 
-	if _, err := tm.PunchIn(workerID, 40.0, -73.0, now); err != nil {
+	if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), now); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
 
@@ -30,11 +32,11 @@ func TestPunchInAndOut(t *testing.T) {
 		t.Errorf("expected no end time yet, got %v", open.EndTime)
 	}
 
-	if _, err := tm.PunchIn(workerID, 40.0, -73.0, now); !errors.Is(err, ErrAlreadyOpen) {
+	if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), now); !errors.Is(err, ErrAlreadyOpen) {
 		t.Errorf("got error %v, want ErrAlreadyOpen", err)
 	}
 
-	if err := tm.PunchOut(workerID, 40.0, -73.0, now.Add(8*time.Hour)); err != nil {
+	if err := tm.PunchOut(workerID, fptr(40.0), fptr(-73.0), now.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchOut: %v", err)
 	}
 
@@ -42,8 +44,40 @@ func TestPunchInAndOut(t *testing.T) {
 		t.Errorf("got error %v, want ErrNoRecord after punch out", err)
 	}
 
-	if err := tm.PunchOut(workerID, 40.0, -73.0, now); !errors.Is(err, ErrNoRecord) {
+	if err := tm.PunchOut(workerID, fptr(40.0), fptr(-73.0), now); !errors.Is(err, ErrNoRecord) {
 		t.Errorf("got error %v, want ErrNoRecord for a second punch out", err)
+	}
+}
+
+func TestPunchInNilCoordsStoresNull(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "No-GPS Worker", "9876", true)
+
+	now := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
+	id, err := tm.PunchIn(workerID, nil, nil, now)
+	if err != nil {
+		t.Fatalf("PunchIn with nil coords: %v", err)
+	}
+
+	p, err := tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if p.StartLat.Valid || p.StartLon.Valid {
+		t.Errorf("StartLat.Valid=%v StartLon.Valid=%v, want both false", p.StartLat.Valid, p.StartLon.Valid)
+	}
+
+	if err := tm.PunchOut(workerID, nil, nil, now.Add(8*time.Hour)); err != nil {
+		t.Fatalf("PunchOut with nil coords: %v", err)
+	}
+
+	p, err = tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get after PunchOut: %v", err)
+	}
+	if p.EndLat.Valid || p.EndLon.Valid {
+		t.Errorf("EndLat.Valid=%v EndLon.Valid=%v, want both false", p.EndLat.Valid, p.EndLon.Valid)
 	}
 }
 
@@ -53,7 +87,7 @@ func TestPunchOutLate(t *testing.T) {
 	workerID := mustInsertWorker(t, db, "Thomas", "4321", true)
 
 	now := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
-	if _, err := tm.PunchIn(workerID, 40.0, -73.0, now); err != nil {
+	if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), now); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
 
@@ -124,13 +158,13 @@ func TestDashboardStatus(t *testing.T) {
 	now := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
 	day := now.Format("2006-01-02")
 
-	if _, err := tm.PunchIn(in, 40.0, -73.0, now); err != nil {
+	if _, err := tm.PunchIn(in, fptr(40.0), fptr(-73.0), now); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
-	if _, err := tm.PunchIn(out, 40.0, -73.0, now); err != nil {
+	if _, err := tm.PunchIn(out, fptr(40.0), fptr(-73.0), now); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
-	if err := tm.PunchOut(out, 40.0, -73.0, now.Add(time.Hour)); err != nil {
+	if err := tm.PunchOut(out, fptr(40.0), fptr(-73.0), now.Add(time.Hour)); err != nil {
 		t.Fatalf("PunchOut: %v", err)
 	}
 
@@ -199,13 +233,13 @@ func TestForPayPeriodAndPayPeriods(t *testing.T) {
 	week1 := payPeriodAnchor.Add(8 * time.Hour)
 	week3 := payPeriodAnchor.AddDate(0, 0, 14).Add(8 * time.Hour)
 
-	if _, err := tm.PunchIn(workerID, 40.0, -73.0, week1); err != nil {
+	if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), week1); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
-	if err := tm.PunchOut(workerID, 40.0, -73.0, week1.Add(time.Hour)); err != nil {
+	if err := tm.PunchOut(workerID, fptr(40.0), fptr(-73.0), week1.Add(time.Hour)); err != nil {
 		t.Fatalf("PunchOut: %v", err)
 	}
-	if _, err := tm.PunchIn(workerID, 40.0, -73.0, week3); err != nil {
+	if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), week3); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
 
@@ -236,7 +270,7 @@ func TestAdminUpdate(t *testing.T) {
 	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
 
 	now := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
-	id, err := tm.PunchIn(workerID, 40.0, -73.0, now)
+	id, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), now)
 	if err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
@@ -275,20 +309,20 @@ func TestAdminUpdateRemovesConflictingPunch(t *testing.T) {
 	saturday := time.Date(2026, 6, 20, 8, 0, 0, 0, time.Local)
 
 	// Existing Friday punch (correct day, already in DB).
-	fridayID, err := tm.PunchIn(workerID, 0, 0, friday)
+	fridayID, err := tm.PunchIn(workerID, nil, nil, friday)
 	if err != nil {
 		t.Fatalf("PunchIn Friday: %v", err)
 	}
-	if err := tm.PunchOut(workerID, 0, 0, friday.Add(8*time.Hour)); err != nil {
+	if err := tm.PunchOut(workerID, nil, nil, friday.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchOut Friday: %v", err)
 	}
 
 	// Saturday punch that the admin is moving to Friday (worker forgot to punch Friday).
-	saturdayID, err := tm.PunchIn(workerID, 0, 0, saturday)
+	saturdayID, err := tm.PunchIn(workerID, nil, nil, saturday)
 	if err != nil {
 		t.Fatalf("PunchIn Saturday: %v", err)
 	}
-	if err := tm.PunchOut(workerID, 0, 0, saturday.Add(8*time.Hour)); err != nil {
+	if err := tm.PunchOut(workerID, nil, nil, saturday.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchOut Saturday: %v", err)
 	}
 
@@ -323,19 +357,19 @@ func TestAdminUpdateDoesNotRemoveNonOverlappingPunch(t *testing.T) {
 	friday := time.Date(2026, 6, 19, 7, 0, 0, 0, time.Local)
 	saturday := time.Date(2026, 6, 20, 8, 0, 0, 0, time.Local)
 
-	fridayID, err := tm.PunchIn(workerID, 0, 0, friday)
+	fridayID, err := tm.PunchIn(workerID, nil, nil, friday)
 	if err != nil {
 		t.Fatalf("PunchIn Friday: %v", err)
 	}
-	if err := tm.PunchOut(workerID, 0, 0, friday.Add(8*time.Hour)); err != nil {
+	if err := tm.PunchOut(workerID, nil, nil, friday.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchOut Friday: %v", err)
 	}
 
-	saturdayID, err := tm.PunchIn(workerID, 0, 0, saturday)
+	saturdayID, err := tm.PunchIn(workerID, nil, nil, saturday)
 	if err != nil {
 		t.Fatalf("PunchIn Saturday: %v", err)
 	}
-	if err := tm.PunchOut(workerID, 0, 0, saturday.Add(8*time.Hour)); err != nil {
+	if err := tm.PunchOut(workerID, nil, nil, saturday.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchOut Saturday: %v", err)
 	}
 
@@ -359,7 +393,7 @@ func TestAdminUpdateRecomputesDayAndPayPeriod(t *testing.T) {
 
 	// Punch in on Saturday (2026-06-20, last day of period 1)
 	saturday := time.Date(2026, 6, 20, 8, 0, 0, 0, time.Local)
-	id, err := tm.PunchIn(workerID, 0, 0, saturday)
+	id, err := tm.PunchIn(workerID, nil, nil, saturday)
 	if err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
@@ -396,7 +430,7 @@ func TestAdminUpdateCrossesPayPeriodBoundary(t *testing.T) {
 
 	// Punch in on the first day of period 2 (2026-06-22)
 	period2Start := time.Date(2026, 6, 22, 8, 0, 0, 0, time.Local)
-	id, err := tm.PunchIn(workerID, 0, 0, period2Start)
+	id, err := tm.PunchIn(workerID, nil, nil, period2Start)
 	if err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
@@ -468,7 +502,7 @@ func TestDelete(t *testing.T) {
 	tm := &TimePunchModel{DB: db}
 	workerID := mustInsertWorker(t, db, "Manthan", "5555", true)
 
-	id, err := tm.PunchIn(workerID, 0, 0, time.Now())
+	id, err := tm.PunchIn(workerID, nil, nil, time.Now())
 	if err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
@@ -495,16 +529,16 @@ func TestAutoPunchOutNonCompliant(t *testing.T) {
 	day := time.Date(2026, 6, 17, 0, 0, 0, 0, time.Local)
 	cutoff := time.Date(2026, 6, 17, 21, 0, 0, 0, time.Local)
 
-	if _, err := tm.PunchIn(alice, 0, 0, day.Add(7*time.Hour)); err != nil {
+	if _, err := tm.PunchIn(alice, nil, nil, day.Add(7*time.Hour)); err != nil {
 		t.Fatalf("PunchIn Alice: %v", err)
 	}
-	if _, err := tm.PunchIn(bob, 0, 0, day.Add(8*time.Hour)); err != nil {
+	if _, err := tm.PunchIn(bob, nil, nil, day.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchIn Bob: %v", err)
 	}
-	if _, err := tm.PunchIn(carlos, 0, 0, day.Add(8*time.Hour)); err != nil {
+	if _, err := tm.PunchIn(carlos, nil, nil, day.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchIn Carlos: %v", err)
 	}
-	if err := tm.PunchOut(carlos, 0, 0, day.Add(17*time.Hour)); err != nil {
+	if err := tm.PunchOut(carlos, nil, nil, day.Add(17*time.Hour)); err != nil {
 		t.Fatalf("PunchOut Carlos: %v", err)
 	}
 
@@ -548,15 +582,15 @@ func TestForPayPeriodNonCompliantOrdering(t *testing.T) {
 	day2 := payPeriodAnchor.AddDate(0, 0, 1).Add(8 * time.Hour)
 
 	// Normal punch on day1
-	if _, err := tm.PunchIn(workerID, 0, 0, day1); err != nil {
+	if _, err := tm.PunchIn(workerID, nil, nil, day1); err != nil {
 		t.Fatalf("PunchIn day1: %v", err)
 	}
-	if err := tm.PunchOut(workerID, 0, 0, day1.Add(8*time.Hour)); err != nil {
+	if err := tm.PunchOut(workerID, nil, nil, day1.Add(8*time.Hour)); err != nil {
 		t.Fatalf("PunchOut day1: %v", err)
 	}
 
 	// Non-compliant punch on day2
-	if _, err := tm.PunchIn(workerID, 0, 0, day2); err != nil {
+	if _, err := tm.PunchIn(workerID, nil, nil, day2); err != nil {
 		t.Fatalf("PunchIn day2: %v", err)
 	}
 	cutoff := time.Date(day2.Year(), day2.Month(), day2.Day(), 21, 0, 0, 0, time.Local)
@@ -615,32 +649,32 @@ func TestPayPeriodSummary(t *testing.T) {
 	mustInsertWorker(t, db, "Yolanda", "4444", false) // inactive, no punches - excluded
 
 	// Alice: two punches on day1 (in/out twice, 1h + 1h), one punch on day2 (1h).
-	id1, err := tm.PunchIn(alice, 0, 0, day1)
+	id1, err := tm.PunchIn(alice, nil, nil, day1)
 	if err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
-	if err := tm.PunchOut(alice, 0, 0, day1.Add(time.Hour)); err != nil {
+	if err := tm.PunchOut(alice, nil, nil, day1.Add(time.Hour)); err != nil {
 		t.Fatalf("PunchOut: %v", err)
 	}
-	id2, err := tm.PunchIn(alice, 0, 0, day1.Add(2*time.Hour))
+	id2, err := tm.PunchIn(alice, nil, nil, day1.Add(2*time.Hour))
 	if err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
-	if err := tm.PunchOut(alice, 0, 0, day1.Add(3*time.Hour)); err != nil {
+	if err := tm.PunchOut(alice, nil, nil, day1.Add(3*time.Hour)); err != nil {
 		t.Fatalf("PunchOut: %v", err)
 	}
-	if _, err := tm.PunchIn(alice, 0, 0, day2); err != nil {
+	if _, err := tm.PunchIn(alice, nil, nil, day2); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
-	if err := tm.PunchOut(alice, 0, 0, day2.Add(time.Hour)); err != nil {
+	if err := tm.PunchOut(alice, nil, nil, day2.Add(time.Hour)); err != nil {
 		t.Fatalf("PunchOut: %v", err)
 	}
 
 	// Bob (inactive): one punch on day1 (5h) - still included since it's in this period.
-	if _, err := tm.PunchIn(bob, 0, 0, day1); err != nil {
+	if _, err := tm.PunchIn(bob, nil, nil, day1); err != nil {
 		t.Fatalf("PunchIn: %v", err)
 	}
-	if err := tm.PunchOut(bob, 0, 0, day1.Add(5*time.Hour)); err != nil {
+	if err := tm.PunchOut(bob, nil, nil, day1.Add(5*time.Hour)); err != nil {
 		t.Fatalf("PunchOut: %v", err)
 	}
 

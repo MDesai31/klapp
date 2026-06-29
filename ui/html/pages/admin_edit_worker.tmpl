@@ -25,6 +25,10 @@
         <option value="english"{{if eq .Worker.Language "english"}} selected{{end}}>English</option>
     </select>
 
+    <label>
+        <input type="checkbox" name="require_location"{{if .Worker.RequireLocation}} checked{{end}}> Require location to punch in
+    </label>
+
     <button type="submit">Save</button>
 </form>
 {{end}}

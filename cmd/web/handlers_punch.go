@@ -59,6 +59,10 @@ func (app *application) punchIn(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
+	if worker.RequireLocation && (lat == nil || lon == nil) {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
 
 	_, err = app.timePunches.PunchIn(worker.ID, lat, lon, time.Now())
 	if err != nil && !errors.Is(err, models.ErrAlreadyOpen) {
@@ -86,6 +90,10 @@ func (app *application) punchOut(w http.ResponseWriter, r *http.Request) {
 
 	lat, lon, err := parseCoords(r)
 	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	if worker.RequireLocation && (lat == nil || lon == nil) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
@@ -157,14 +165,21 @@ func pickMsg(spanish bool, es, en string) string {
 	return en
 }
 
-func parseCoords(r *http.Request) (lat, lon float64, err error) {
-	lat, err = strconv.ParseFloat(r.PostFormValue("lat"), 64)
-	if err != nil {
-		return 0, 0, err
+// parseCoords returns nil pointers when lat/lon fields are empty (location not
+// captured). Returns an error only if the fields are non-empty but unparseable.
+func parseCoords(r *http.Request) (lat, lon *float64, err error) {
+	latStr := r.PostFormValue("lat")
+	lonStr := r.PostFormValue("lon")
+	if latStr == "" || lonStr == "" {
+		return nil, nil, nil
 	}
-	lon, err = strconv.ParseFloat(r.PostFormValue("lon"), 64)
+	latVal, err := strconv.ParseFloat(latStr, 64)
 	if err != nil {
-		return 0, 0, err
+		return nil, nil, err
 	}
-	return lat, lon, nil
+	lonVal, err := strconv.ParseFloat(lonStr, 64)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &latVal, &lonVal, nil
 }

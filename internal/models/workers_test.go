@@ -61,7 +61,7 @@ func TestWorkerCreateListAndSetActive(t *testing.T) {
 	db := newTestDB(t)
 	wm := &WorkerModel{DB: db}
 
-	id, err := wm.Create("New Hire", "5555", "555-0199", 0, "spanish")
+	id, err := wm.Create("New Hire", "5555", "555-0199", 0, "spanish", false)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestWorkerUpdate(t *testing.T) {
 
 	id := mustInsertWorker(t, db, "Original Name", "1111", true)
 
-	if err := wm.Update(id, "New Name", "2222", "555-0100", 0, "spanish"); err != nil {
+	if err := wm.Update(id, "New Name", "2222", "555-0100", 0, "spanish", false); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -120,7 +120,7 @@ func TestWorkerUpdate(t *testing.T) {
 		t.Errorf("updated PIN should authenticate, got error %v", err)
 	}
 
-	if err := wm.Update(id+999, "Nobody", "3333", "", 0, "spanish"); !errors.Is(err, ErrNoRecord) {
+	if err := wm.Update(id+999, "Nobody", "3333", "", 0, "spanish", false); !errors.Is(err, ErrNoRecord) {
 		t.Errorf("got error %v, want ErrNoRecord for unknown worker", err)
 	}
 }
@@ -133,26 +133,75 @@ func TestWorkerDuplicatePIN(t *testing.T) {
 	inactiveID := mustInsertWorker(t, db, "Inactive Worker", "5678", false)
 
 	t.Run("Create rejects a PIN already used by an active worker", func(t *testing.T) {
-		if _, err := wm.Create("New Hire", "1234", "", 0, "spanish"); !errors.Is(err, ErrDuplicatePIN) {
+		if _, err := wm.Create("New Hire", "1234", "", 0, "spanish", false); !errors.Is(err, ErrDuplicatePIN) {
 			t.Errorf("got error %v, want ErrDuplicatePIN", err)
 		}
 	})
 
 	t.Run("Create rejects a PIN already used by an inactive worker", func(t *testing.T) {
-		if _, err := wm.Create("New Hire", "5678", "", 0, "spanish"); !errors.Is(err, ErrDuplicatePIN) {
+		if _, err := wm.Create("New Hire", "5678", "", 0, "spanish", false); !errors.Is(err, ErrDuplicatePIN) {
 			t.Errorf("got error %v, want ErrDuplicatePIN", err)
 		}
 	})
 
 	t.Run("Update rejects changing to another worker's PIN", func(t *testing.T) {
-		if err := wm.Update(inactiveID, "Inactive Worker", "1234", "", 0, "spanish"); !errors.Is(err, ErrDuplicatePIN) {
+		if err := wm.Update(inactiveID, "Inactive Worker", "1234", "", 0, "spanish", false); !errors.Is(err, ErrDuplicatePIN) {
 			t.Errorf("got error %v, want ErrDuplicatePIN", err)
 		}
 	})
 
 	t.Run("Update allows a worker to keep its own PIN", func(t *testing.T) {
-		if err := wm.Update(activeID, "Active Worker", "1234", "555-0101", 0, "spanish"); err != nil {
+		if err := wm.Update(activeID, "Active Worker", "1234", "555-0101", 0, "spanish", false); err != nil {
 			t.Errorf("unexpected error keeping own PIN: %v", err)
 		}
 	})
+}
+
+func TestWorkerRequireLocation(t *testing.T) {
+	db := newTestDB(t)
+	wm := &WorkerModel{DB: db}
+
+	id, err := wm.Create("Field Worker", "7777", "555-0100", 15.0, "english", true)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// Get round-trips the field.
+	w, err := wm.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !w.RequireLocation {
+		t.Error("Get: RequireLocation = false, want true")
+	}
+
+	// Authenticate returns it too.
+	w, err = wm.Authenticate("7777")
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	if !w.RequireLocation {
+		t.Error("Authenticate: RequireLocation = false, want true")
+	}
+
+	// List includes it.
+	workers, err := wm.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(workers) != 1 || !workers[0].RequireLocation {
+		t.Errorf("List: RequireLocation = false, want true")
+	}
+
+	// Update can clear it.
+	if err := wm.Update(id, "Field Worker", "7777", "555-0100", 15.0, "english", false); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	w, err = wm.Get(id)
+	if err != nil {
+		t.Fatalf("Get after Update: %v", err)
+	}
+	if w.RequireLocation {
+		t.Error("Get after Update: RequireLocation = true, want false")
+	}
 }

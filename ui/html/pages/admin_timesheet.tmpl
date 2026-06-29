@@ -4,8 +4,11 @@
 {{template "nav" .}}
 
 <h1>Timesheet</h1>
-<p>Pay period starting {{.CurrentPeriod}}. Other periods:
-{{range .PayPeriods}}<a href="/admin/timesheet?period={{.}}">{{.}}</a> {{end}}
+<p>Pay period:
+<select onchange="window.location='/admin/timesheet?period='+this.value">
+{{range .PayPeriods}}<option value="{{.}}"{{if eq . $.CurrentPeriod}} selected{{end}}>{{.}}</option>
+{{end}}
+</select>
 </p>
 <p><a href="/admin/punches/new">+ Add entry</a></p>
 

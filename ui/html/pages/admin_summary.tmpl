@@ -4,8 +4,11 @@
 {{template "nav" .}}
 
 <h1>Pay period summary</h1>
-<p>Pay period starting {{.CurrentPeriod}}. Other periods:
-{{range .PayPeriods}}<a href="/admin/summary?period={{.}}">{{.}}</a> {{end}}
+<p>Pay period:
+<select onchange="window.location='/admin/summary?period='+this.value">
+{{range .PayPeriods}}<option value="{{.}}"{{if eq . $.CurrentPeriod}} selected{{end}}>{{.}}</option>
+{{end}}
+</select>
 </p>
 
 <table>

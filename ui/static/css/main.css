@@ -96,6 +96,10 @@ tr.non-compliant {
     font-weight: bold;
 }
 
+tr.nc-edited {
+    background: #e8f4fd;
+}
+
 .btn-delete {
     width: auto;
     padding: 0.15rem 0.4rem;

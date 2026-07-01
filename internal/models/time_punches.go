@@ -367,7 +367,7 @@ func (m *TimePunchModel) ForPayPeriod(payPeriod string) ([]TimesheetRow, error) 
 		FROM time_punches tp
 		JOIN workers w ON w.id = tp.worker_id
 		WHERE tp.pay_period = ?
-		ORDER BY tp.non_compliant DESC, tp.day DESC, w.worker_name`
+		ORDER BY (tp.non_compliant AND NOT tp.modified_by_admin) DESC, tp.day DESC, w.worker_name`
 
 	rows, err := m.DB.Query(stmt, payPeriod)
 	if err != nil {

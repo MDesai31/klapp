@@ -17,7 +17,7 @@
     <th>Worker</th><th>Day</th><th>In</th><th>Out</th><th>Late</th><th>Edited</th><th>Non-compliant</th><th>Location</th><th></th>
 </tr>
 {{range .TimesheetRows}}
-<tr{{if .NonCompliant}} class="non-compliant"{{else if .Late}} class="late"{{end}}>
+<tr{{if and .NonCompliant (not .ModifiedByAdmin)}} class="non-compliant"{{else if .NonCompliant}} class="nc-edited"{{else if .Late}} class="late"{{end}}>
     <td>{{.WorkerName}}</td>
     <td>{{.Day}}</td>
     <td>{{.StartTime.Local.Format "3:04 PM"}}</td>

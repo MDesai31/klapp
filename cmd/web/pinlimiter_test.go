@@ -85,6 +85,21 @@ func TestClientIPPrefersForwardedFor(t *testing.T) {
 	}
 }
 
+func TestClientIPIgnoresForwardedForFromDirectClients(t *testing.T) {
+	r, err := http.NewRequest("POST", "/punch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Not loopback, so this didn't come through Caddy - a spoofed
+	// X-Forwarded-For must not let the client pick its own limiter key.
+	r.RemoteAddr = "203.0.113.9:54321"
+	r.Header.Set("X-Forwarded-For", "8.8.8.8")
+
+	if got := clientIP(r); got != "203.0.113.9" {
+		t.Errorf("clientIP() = %q, want %q", got, "203.0.113.9")
+	}
+}
+
 func TestClientIPFallsBackToRemoteAddr(t *testing.T) {
 	r, err := http.NewRequest("POST", "/punch", nil)
 	if err != nil {

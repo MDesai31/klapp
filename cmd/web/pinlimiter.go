@@ -109,19 +109,25 @@ func (l *pinLimiter) cleanup() {
 }
 
 // clientIP returns the IP address a request should be attributed to for
-// rate-limiting purposes. The worker site is only reachable via Caddy on
-// 127.0.0.1 (see deploy/klapp.service, deploy/Caddyfile) - nothing else can
-// reach this process directly - so the client IP Caddy reports in
-// X-Forwarded-For is trusted.
+// rate-limiting purposes. In production the worker site is only reachable
+// via Caddy on 127.0.0.1 (see deploy/klapp.service, deploy/Caddyfile), so
+// the client IP Caddy reports in X-Forwarded-For is trusted - but only
+// when the direct peer actually is loopback. A directly-reachable client
+// (e.g. a dev run bound to all interfaces) could otherwise spoof the
+// header and dodge the PIN lockout.
 func clientIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		if ip := strings.TrimSpace(strings.Split(fwd, ",")[0]); ip != "" {
-			return ip
-		}
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
 	}
+
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			if first := strings.TrimSpace(strings.Split(fwd, ",")[0]); first != "" {
+				return first
+			}
+		}
+	}
+
 	return host
 }

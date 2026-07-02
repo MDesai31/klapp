@@ -139,11 +139,22 @@ func (app *application) punchLate(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	endTime := time.Date(now.Year(), now.Month(), now.Day(), clockTime.Hour(), clockTime.Minute(), 0, 0, time.Local)
+	// A clock time that hasn't happened yet today means the worker is
+	// reporting yesterday's finish after midnight (e.g. entering "22:30"
+	// at 7 AM the next morning) - attach it to yesterday instead.
+	if endTime.After(now) {
+		endTime = endTime.AddDate(0, 0, -1)
+	}
 
 	err = app.timePunches.PunchOutLate(worker.ID, endTime)
 	if err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
 			flash := pickMsg(spanish, "No hay entrada abierta para hoy.", "No open punch found for you today.")
+			app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
+			return
+		}
+		if errors.Is(err, models.ErrEndBeforeStart) {
+			flash := pickMsg(spanish, "Esa hora es antes de tu hora de entrada. Revisa e inténtalo de nuevo.", "That time is before your punch-in time. Check it and try again.")
 			app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
 			return
 		}

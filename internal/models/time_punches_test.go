@@ -890,3 +890,61 @@ func TestAdminCreateSecondOpenPunchConflicts(t *testing.T) {
 		t.Errorf("got error %v, want ErrAlreadyOpen", err)
 	}
 }
+
+func TestPunchOutLateAfterNightlySweep(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Thomas", "4321", true)
+
+	start := time.Date(2026, 6, 10, 10, 0, 0, 0, time.Local)
+	id, err := tm.PunchIn(workerID, nil, nil, start)
+	if err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	// The 9 PM sweep closes the punch before the worker reports in.
+	if _, err := tm.AutoPunchOutNonCompliant(time.Date(2026, 6, 10, 21, 0, 0, 0, time.Local)); err != nil {
+		t.Fatalf("AutoPunchOutNonCompliant: %v", err)
+	}
+
+	// The late report must still land, correcting the swept end time.
+	realEnd := time.Date(2026, 6, 10, 17, 30, 0, 0, time.Local)
+	if err := tm.PunchOutLate(workerID, realEnd); err != nil {
+		t.Fatalf("PunchOutLate after sweep: %v", err)
+	}
+
+	p, err := tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !p.Late {
+		t.Error("expected late = true")
+	}
+	if !p.NonCompliant {
+		t.Error("expected non_compliant to stay true so the admin still reviews it")
+	}
+	if got, want := p.EndTime.String, realEnd.UTC().Format(time.RFC3339); got != want {
+		t.Errorf("end time = %q, want %q", got, want)
+	}
+
+	// A second late report must not find anything (late = TRUE now).
+	if err := tm.PunchOutLate(workerID, realEnd.Add(time.Hour)); !errors.Is(err, ErrNoRecord) {
+		t.Errorf("got error %v, want ErrNoRecord for a second late report", err)
+	}
+}
+
+func TestPunchOutLateEndBeforeStart(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Thomas", "4321", true)
+
+	start := time.Date(2026, 6, 10, 10, 0, 0, 0, time.Local)
+	if _, err := tm.PunchIn(workerID, nil, nil, start); err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	err := tm.PunchOutLate(workerID, start.Add(-time.Hour))
+	if !errors.Is(err, ErrEndBeforeStart) {
+		t.Errorf("got error %v, want ErrEndBeforeStart", err)
+	}
+}

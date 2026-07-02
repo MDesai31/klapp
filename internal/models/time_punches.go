@@ -281,26 +281,44 @@ func (m *TimePunchModel) PunchOut(workerID int, lat, lon *float64, now time.Time
 	return nil
 }
 
-// PunchOutLate closes the worker's open punch via the late-notice link.
-// No location is captured for a late punch-out - the worker is just
-// entering a finish time after the fact.
+// PunchOutLate records a worker's real end time via the late-notice link.
+// No location is captured - the worker is just entering a finish time after
+// the fact. It closes the worker's open punch if one exists; otherwise it
+// corrects the punch on endTime's day that the 9 PM sweep already
+// auto-closed (non_compliant, not yet late-reported, not admin-edited) -
+// without this second case the late link would be useless after the sweep
+// runs. Returns ErrNoRecord if neither exists, ErrEndBeforeStart if
+// endTime is not after the punch's start.
 func (m *TimePunchModel) PunchOutLate(workerID int, endTime time.Time) error {
-	stmt := `UPDATE time_punches SET end_time = ?, late = TRUE
-		WHERE worker_id = ? AND end_time IS NULL`
-	result, err := m.DB.Exec(stmt, endTime.UTC().Format(time.RFC3339), workerID)
-	if err != nil {
-		return err
-	}
+	day := endTime.Local().Format("2006-01-02")
 
-	n, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
+	var id int
+	var start string
+	err := m.DB.QueryRow(`
+		SELECT id, start_time FROM time_punches
+		WHERE worker_id = ?
+		  AND (end_time IS NULL
+		       OR (day = ? AND non_compliant AND NOT late AND NOT modified_by_admin))
+		ORDER BY (end_time IS NULL) DESC, start_time DESC
+		LIMIT 1`, workerID, day).Scan(&id, &start)
+	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNoRecord
 	}
+	if err != nil {
+		return err
+	}
 
-	return nil
+	startTime, err := time.Parse(time.RFC3339, start)
+	if err != nil {
+		return err
+	}
+	if !endTime.After(startTime) {
+		return ErrEndBeforeStart
+	}
+
+	_, err = m.DB.Exec(`UPDATE time_punches SET end_time = ?, late = TRUE WHERE id = ?`,
+		endTime.UTC().Format(time.RFC3339), id)
+	return err
 }
 
 // AdminUpdate overwrites a punch's start/end time as corrected by an

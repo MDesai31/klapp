@@ -52,7 +52,10 @@ func (app *application) adminInvoiceView(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	app.render(w, r, http.StatusOK, "admin_invoice_view.tmpl", templateData{Invoice: &inv})
+	app.render(w, r, http.StatusOK, "admin_invoice_view.tmpl", templateData{
+		Invoice: &inv,
+		Flash:   app.sessionManager.PopString(r.Context(), "flash"),
+	})
 }
 
 func (app *application) adminInvoiceSubmit(w http.ResponseWriter, r *http.Request) {
@@ -74,12 +77,18 @@ func (app *application) adminInvoiceSubmit(w http.ResponseWriter, r *http.Reques
 
 	if !inv.Reviewed {
 		if emailErr := sendInvoiceEmail(&inv); emailErr != nil {
+			// Don't mark reviewed on failure - a silently swallowed error
+			// here means an invoice that looks submitted but never arrived.
 			app.logger.Error("sending invoice email", "error", emailErr, "invoice_id", id)
+			app.sessionManager.Put(r.Context(), "flash", "Email failed to send - invoice was NOT marked reviewed. Check the mail setup and try again.")
+			http.Redirect(w, r, fmt.Sprintf("/admin/invoices/%d", id), http.StatusSeeOther)
+			return
 		}
 		if err := app.invoices.SetReviewed(id); err != nil {
 			app.serverError(w, r, err)
 			return
 		}
+		app.sessionManager.Put(r.Context(), "flash", "Invoice emailed and marked reviewed.")
 	}
 
 	http.Redirect(w, r, fmt.Sprintf("/admin/invoices/%d", id), http.StatusSeeOther)

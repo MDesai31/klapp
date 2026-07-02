@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", "SQLite data source name")
+	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", "SQLite data source name")
 	username := flag.String("username", "", "admin username (required)")
 	password := flag.String("password", "", "admin password (required)")
 	flag.Parse()

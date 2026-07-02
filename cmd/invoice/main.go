@@ -29,7 +29,7 @@ type application struct {
 
 func main() {
 	addr := flag.String("addr", ":8083", "invoice site HTTP network address (LAN/WireGuard only)")
-	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", "SQLite data source name")
+	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", "SQLite data source name")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -66,7 +66,15 @@ func main() {
 	}
 
 	logger.Info("starting invoice site", slog.String("addr", *addr))
-	if err := http.ListenAndServe(*addr, app.session.LoadAndSave(app.routes())); err != nil {
+	srv := &http.Server{
+		Addr:              *addr,
+		Handler:           app.session.LoadAndSave(app.routes()),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}

@@ -34,7 +34,7 @@ type application struct {
 func main() {
 	addr := flag.String("addr", ":4000", "worker site HTTP network address")
 	adminAddr := flag.String("admin-addr", ":8082", "admin site HTTP network address (LAN/WireGuard only - do not expose publicly)")
-	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", "SQLite data source name")
+	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", "SQLite data source name")
 	configPath := flag.String("config", "config.json", "path to JSON config file (optional; defaults used if missing, see config.example.json)")
 	flag.Parse()
 
@@ -93,18 +93,32 @@ func main() {
 
 	go func() {
 		logger.Info("starting worker site", slog.String("addr", *addr))
-		errc <- http.ListenAndServe(*addr, app.routes())
+		errc <- newServer(*addr, app.routes()).ListenAndServe()
 	}()
 
 	go func() {
 		logger.Info("starting admin site", slog.String("addr", *adminAddr))
-		errc <- http.ListenAndServe(*adminAddr, app.adminRoutes())
+		errc <- newServer(*adminAddr, app.adminRoutes()).ListenAndServe()
 	}()
 
 	go app.runNightlyPunchOut()
 
 	logger.Error((<-errc).Error())
 	os.Exit(1)
+}
+
+// newServer wraps a handler in an http.Server with sane timeouts, so slow
+// or stalled clients can't hold connections (and their goroutines) open
+// indefinitely.
+func newServer(addr string, h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
 }
 
 // nightlySweepAfter returns the next 9 PM local time strictly after now.

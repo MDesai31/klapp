@@ -76,19 +76,19 @@ func (app *application) adminInvoiceSubmit(w http.ResponseWriter, r *http.Reques
 	}
 
 	if !inv.Reviewed {
+		// Reviewed doesn't depend on the email going out - the admin has
+		// seen the invoice either way - but a send failure is surfaced in
+		// the flash so it isn't lost in the server log.
+		flash := "Invoice emailed and marked reviewed."
 		if emailErr := sendInvoiceEmail(&inv); emailErr != nil {
-			// Don't mark reviewed on failure - a silently swallowed error
-			// here means an invoice that looks submitted but never arrived.
 			app.logger.Error("sending invoice email", "error", emailErr, "invoice_id", id)
-			app.sessionManager.Put(r.Context(), "flash", "Email failed to send - invoice was NOT marked reviewed. Check the mail setup and try again.")
-			http.Redirect(w, r, fmt.Sprintf("/admin/invoices/%d", id), http.StatusSeeOther)
-			return
+			flash = "Invoice marked reviewed, but the email FAILED to send - check the mail setup."
 		}
 		if err := app.invoices.SetReviewed(id); err != nil {
 			app.serverError(w, r, err)
 			return
 		}
-		app.sessionManager.Put(r.Context(), "flash", "Invoice emailed and marked reviewed.")
+		app.sessionManager.Put(r.Context(), "flash", flash)
 	}
 
 	http.Redirect(w, r, fmt.Sprintf("/admin/invoices/%d", id), http.StatusSeeOther)

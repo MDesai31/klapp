@@ -755,3 +755,138 @@ func TestPayPeriodSummary(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminUpdateClearedEndKeepsLaterPunches(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
+
+	mk := func(day int) int {
+		start := time.Date(2026, 6, day, 8, 0, 0, 0, time.Local)
+		id, err := tm.AdminCreate(workerID, start, start.Add(8*time.Hour))
+		if err != nil {
+			t.Fatalf("AdminCreate day %d: %v", day, err)
+		}
+		return id
+	}
+	first := mk(9)
+	mk(10)
+	mk(11)
+
+	// Clearing the end time reopens the June 9 punch; it must NOT be treated
+	// as overlapping (and deleting) the June 10 and 11 punches.
+	if err := tm.AdminUpdate(first, time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local), time.Time{}); err != nil {
+		t.Fatalf("AdminUpdate: %v", err)
+	}
+
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM time_punches WHERE worker_id = ?`, workerID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Errorf("got %d punches after clearing an end time, want 3 (later punches must survive)", n)
+	}
+
+	open, err := tm.Open(workerID)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if open.ID != first {
+		t.Errorf("open punch = %d, want %d", open.ID, first)
+	}
+}
+
+func TestAdminUpdateClearedEndStillReplacesSameDayPunch(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
+
+	start := time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local)
+	edited, err := tm.AdminCreate(workerID, start, start.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("AdminCreate: %v", err)
+	}
+	// A second punch later the same day overlaps the reopened range and
+	// should be replaced, same as before.
+	if _, err := tm.AdminCreate(workerID, start.Add(4*time.Hour), start.Add(6*time.Hour)); err != nil {
+		t.Fatalf("AdminCreate same-day: %v", err)
+	}
+
+	if err := tm.AdminUpdate(edited, start, time.Time{}); err != nil {
+		t.Fatalf("AdminUpdate: %v", err)
+	}
+
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM time_punches WHERE worker_id = ?`, workerID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("got %d punches, want 1 (same-day overlap should be replaced)", n)
+	}
+}
+
+func TestAdminUpdateClearedEndConflictsWithOpenPunch(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
+
+	closedStart := time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local)
+	closed, err := tm.AdminCreate(workerID, closedStart, closedStart.Add(8*time.Hour))
+	if err != nil {
+		t.Fatalf("AdminCreate: %v", err)
+	}
+	if _, err := tm.PunchIn(workerID, nil, nil, time.Date(2026, 6, 11, 8, 0, 0, 0, time.Local)); err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	// Reopening the June 9 punch would give the worker two open punches.
+	err = tm.AdminUpdate(closed, closedStart, time.Time{})
+	if !errors.Is(err, ErrAlreadyOpen) {
+		t.Errorf("got error %v, want ErrAlreadyOpen", err)
+	}
+}
+
+func TestAdminUpdateEndBeforeStart(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
+
+	start := time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local)
+	id, err := tm.AdminCreate(workerID, start, start.Add(8*time.Hour))
+	if err != nil {
+		t.Fatalf("AdminCreate: %v", err)
+	}
+
+	err = tm.AdminUpdate(id, start, start.Add(-time.Hour))
+	if !errors.Is(err, ErrEndBeforeStart) {
+		t.Errorf("got error %v, want ErrEndBeforeStart", err)
+	}
+}
+
+func TestAdminCreateEndBeforeStart(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
+
+	start := time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local)
+	if _, err := tm.AdminCreate(workerID, start, start.Add(-time.Hour)); !errors.Is(err, ErrEndBeforeStart) {
+		t.Errorf("got error %v, want ErrEndBeforeStart", err)
+	}
+}
+
+func TestAdminCreateSecondOpenPunchConflicts(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
+
+	if _, err := tm.PunchIn(workerID, nil, nil, time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local)); err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	// The unique index (not just the handler-level Open() check) must stop a
+	// second open punch - this is what closes the double-tap race.
+	_, err := tm.AdminCreate(workerID, time.Date(2026, 6, 10, 8, 0, 0, 0, time.Local), time.Time{})
+	if !errors.Is(err, ErrAlreadyOpen) {
+		t.Errorf("got error %v, want ErrAlreadyOpen", err)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -208,6 +209,14 @@ func (m *TimePunchModel) Get(id int) (TimePunch, error) {
 	return p, nil
 }
 
+// isOpenPunchConflict reports whether err is the UNIQUE violation from
+// idx_time_punches_one_open, i.e. an attempt to give a worker a second
+// open punch. SQLite reports partial-index violations by column, and the
+// only unique constraint on time_punches.worker_id is that index.
+func isOpenPunchConflict(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: time_punches.worker_id")
+}
+
 // PunchIn records a new punch-in. It refuses to create one if the worker
 // already has an open punch.
 func (m *TimePunchModel) PunchIn(workerID int, lat, lon *float64, now time.Time) (int, error) {
@@ -234,6 +243,11 @@ func (m *TimePunchModel) PunchIn(workerID int, lat, lon *float64, now time.Time)
 	stmt := `INSERT INTO time_punches (worker_id, pay_period, day, start_time, start_lat, start_lon)
 		VALUES (?, ?, ?, ?, ?, ?)`
 	result, err := m.DB.Exec(stmt, workerID, payPeriod, day, now.UTC().Format(time.RFC3339), lat, lon)
+	if isOpenPunchConflict(err) {
+		// Two punch-ins raced past the Open() check above (e.g. a
+		// double-tap); the partial unique index caught the second one.
+		return 0, ErrAlreadyOpen
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -297,8 +311,19 @@ func (m *TimePunchModel) PunchOutLate(workerID int, endTime time.Time) error {
 // Any other punch for the same worker whose time range overlaps the new
 // range is deleted in the same transaction, so an edit that moves a punch
 // onto a day that already has an entry replaces that entry rather than
-// producing a duplicate.
+// producing a duplicate. When the end time is cleared, the overlap window
+// is capped at the end of startTime's day - an open punch must NOT be
+// treated as extending forever, or clearing the end time on an old punch
+// would silently delete every later punch for that worker.
+//
+// Returns ErrEndBeforeStart if endTime is set but not after startTime, and
+// ErrAlreadyOpen if clearing the end time would give the worker a second
+// open punch.
 func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error {
+	if !endTime.IsZero() && !endTime.After(startTime) {
+		return ErrEndBeforeStart
+	}
+
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return err
@@ -306,18 +331,42 @@ func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error
 	defer tx.Rollback()
 
 	var end any
-	if !endTime.IsZero() {
+	overlapEnd := endTime
+	if endTime.IsZero() {
+		local := startTime.Local()
+		overlapEnd = time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local).AddDate(0, 0, 1)
+	} else {
 		end = endTime.UTC().Format(time.RFC3339)
 	}
 
 	day := startTime.Local().Format("2006-01-02")
 	payPeriod := payPeriodStart(startTime.Local()).Format("2006-01-02")
 
+	// Delete overlapping punches first: if the edit clears the end time and
+	// the same day holds another (now-redundant) punch, removing it before
+	// the UPDATE keeps the one-open-punch index from rejecting the edit.
+	// Overlap condition: existing.start < new.end AND
+	//                    (existing.end IS NULL OR existing.end > new.start)
+	newStart := startTime.UTC().Format(time.RFC3339)
+	_, err = tx.Exec(`
+		DELETE FROM time_punches
+		WHERE id != ?
+		  AND worker_id = (SELECT worker_id FROM time_punches WHERE id = ?)
+		  AND start_time < ?
+		  AND (end_time IS NULL OR end_time > ?)`,
+		id, id, overlapEnd.UTC().Format(time.RFC3339), newStart)
+	if err != nil {
+		return err
+	}
+
 	result, err := tx.Exec(`
 		UPDATE time_punches
 		SET start_time = ?, end_time = ?, day = ?, pay_period = ?, modified_by_admin = TRUE
 		WHERE id = ?`,
-		startTime.UTC().Format(time.RFC3339), end, day, payPeriod, id)
+		newStart, end, day, payPeriod, id)
+	if isOpenPunchConflict(err) {
+		return ErrAlreadyOpen
+	}
 	if err != nil {
 		return err
 	}
@@ -327,21 +376,6 @@ func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error
 	}
 	if n == 0 {
 		return ErrNoRecord
-	}
-
-	// Delete any other punch for the same worker that overlaps [startTime, endTime].
-	// Overlap condition: existing.start < new.end (or new.end is null → open)
-	//                AND (existing.end IS NULL OR existing.end > new.start)
-	newStart := startTime.UTC().Format(time.RFC3339)
-	_, err = tx.Exec(`
-		DELETE FROM time_punches
-		WHERE id != ?
-		  AND worker_id = (SELECT worker_id FROM time_punches WHERE id = ?)
-		  AND (? IS NULL OR start_time < ?)
-		  AND (end_time IS NULL OR end_time > ?)`,
-		id, id, end, end, newStart)
-	if err != nil {
-		return err
 	}
 
 	return tx.Commit()
@@ -595,8 +629,14 @@ func (m *TimePunchModel) Delete(id int) error {
 }
 
 // AdminCreate inserts a new punch on behalf of an admin (no GPS coords).
-// A zero endTime leaves the punch open.
+// A zero endTime leaves the punch open. Returns ErrEndBeforeStart if
+// endTime is set but not after startTime, and ErrAlreadyOpen if an open
+// punch is requested for a worker who already has one.
 func (m *TimePunchModel) AdminCreate(workerID int, startTime, endTime time.Time) (int, error) {
+	if !endTime.IsZero() && !endTime.After(startTime) {
+		return 0, ErrEndBeforeStart
+	}
+
 	day := startTime.Local().Format("2006-01-02")
 	payPeriod := payPeriodStart(startTime.Local()).Format("2006-01-02")
 
@@ -609,6 +649,9 @@ func (m *TimePunchModel) AdminCreate(workerID int, startTime, endTime time.Time)
 		(worker_id, pay_period, day, start_time, end_time, start_lat, start_lon, modified_by_admin)
 		VALUES (?, ?, ?, ?, ?, 0, 0, TRUE)`
 	result, err := m.DB.Exec(stmt, workerID, payPeriod, day, startTime.UTC().Format(time.RFC3339), end)
+	if isOpenPunchConflict(err) {
+		return 0, ErrAlreadyOpen
+	}
 	if err != nil {
 		return 0, err
 	}

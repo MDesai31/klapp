@@ -3,6 +3,7 @@
 {{define "main"}}
 {{template "nav" .}}
 
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
 <h1>Add Timesheet Entry</h1>
 <form action="/admin/punches/new" method="POST">
     <label for="worker_id">Worker</label>

@@ -71,11 +71,32 @@ func (app *application) adminAddPunch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := app.timePunches.AdminCreate(workerID, start, end); err != nil {
+		if flash, ok := punchTimeErrorFlash(err); ok {
+			workers, err := app.workers.List()
+			if err != nil {
+				app.serverError(w, r, err)
+				return
+			}
+			app.render(w, r, http.StatusOK, "admin_add_punch.tmpl", templateData{Workers: workers, Flash: flash})
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}
 
 	http.Redirect(w, r, "/admin/timesheet?period="+models.CurrentPayPeriod(start), http.StatusSeeOther)
+}
+
+// punchTimeErrorFlash maps the validation errors AdminCreate/AdminUpdate
+// can return to an admin-facing flash message.
+func punchTimeErrorFlash(err error) (string, bool) {
+	switch {
+	case errors.Is(err, models.ErrEndBeforeStart):
+		return "End time must be after the start time.", true
+	case errors.Is(err, models.ErrAlreadyOpen):
+		return "This worker already has an open punch - close it first before adding another open entry.", true
+	}
+	return "", false
 }
 
 func (app *application) adminTimesheet(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +175,20 @@ func (app *application) adminEditPunch(w http.ResponseWriter, r *http.Request) {
 	if err := app.timePunches.AdminUpdate(id, start, end); err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
 			app.clientError(w, http.StatusNotFound)
+			return
+		}
+		if flash, ok := punchTimeErrorFlash(err); ok {
+			punch, err := app.timePunches.Get(id)
+			if err != nil {
+				app.serverError(w, r, err)
+				return
+			}
+			worker, err := app.workers.Get(punch.WorkerID)
+			if err != nil {
+				app.serverError(w, r, err)
+				return
+			}
+			app.render(w, r, http.StatusOK, "admin_edit_punch.tmpl", templateData{Punch: &punch, Worker: &worker, Flash: flash})
 			return
 		}
 		app.serverError(w, r, err)

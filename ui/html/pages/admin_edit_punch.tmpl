@@ -3,6 +3,7 @@
 {{define "main"}}
 {{template "nav" .}}
 
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
 <h1>Edit punch for {{.Worker.WorkerName}}</h1>
 <form action="/admin/punches/{{.Punch.ID}}/edit" method="POST">
     <label for="start_time">Start</label>

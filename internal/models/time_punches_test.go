@@ -948,3 +948,21 @@ func TestPunchOutLateEndBeforeStart(t *testing.T) {
 		t.Errorf("got error %v, want ErrEndBeforeStart", err)
 	}
 }
+
+// TestPayPeriodStartEveryDayInOwnPeriod sweeps several years of dates -
+// including DST transitions when the test runs in a zone that has them -
+// and checks the invariants the hour-division bug used to break: every
+// date falls inside its own 14-day period and every period starts on a
+// Monday.
+func TestPayPeriodStartEveryDayInOwnPeriod(t *testing.T) {
+	for d := time.Date(2026, 1, 1, 0, 0, 0, 0, time.Local); d.Year() < 2031; d = d.AddDate(0, 0, 1) {
+		start := payPeriodStart(d)
+		end := start.AddDate(0, 0, 14)
+		if d.Before(start) || !d.Before(end) {
+			t.Errorf("date %s -> period start %s does not contain the date", d.Format("2006-01-02"), start.Format("2006-01-02"))
+		}
+		if start.Weekday() != time.Monday {
+			t.Errorf("date %s -> period start %s is a %s, not Monday", d.Format("2006-01-02"), start.Format("2006-01-02"), start.Weekday())
+		}
+	}
+}

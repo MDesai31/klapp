@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 )
@@ -115,7 +116,11 @@ var payPeriodAnchor = time.Date(2026, 6, 8, 0, 0, 0, 0, time.Local)
 
 func payPeriodStart(t time.Time) time.Time {
 	t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-	days := int(t.Sub(payPeriodAnchor).Hours() / 24)
+	// Both times are local midnights, but a DST transition between them
+	// makes the elapsed time 23 or 25 hours for one of the days; rounding
+	// (rather than truncating) absorbs that ±1h so the day count stays
+	// calendar-correct.
+	days := int(math.Round(t.Sub(payPeriodAnchor).Hours() / 24))
 	periodIndex := days / 14
 	if days < 0 && days%14 != 0 {
 		periodIndex--

@@ -25,19 +25,33 @@ defense in depth (e.g. `gorilla/csrf`).
 `ui/html/pages/admin_workers.tmpl:31` — PIN input is `type="text"`, not
 `type="password"`, so it's visible on-screen when an admin enters/edits it.
 
-### Low: No lockout on repeated failed PIN/admin password attempts
-`internal/models/workers.go:24` (`WorkerModel.Authenticate`), `internal/models/admins.go`
-— PINs are bcrypt-hashed and compared via `bcrypt.CompareHashAndPassword`
-(constant-time, no timing leak), but nothing stops unlimited guessing.
+### Fixed: No lockout on repeated failed PIN attempts
+`internal/models/workers.go` (`WorkerModel.Authenticate`) — worker PINs are
+compared with a plain `==` (not bcrypt/hashed at all — the earlier note here
+claiming bcrypt comparison was wrong; only admin passwords go through
+`bcrypt.CompareHashAndPassword` in `internal/models/admins.go`). Nothing
+stopped unlimited guessing.
 
-**In progress:** adding a 4-attempt lockout with the count shown to the
-worker as they type. Design wrinkle: `Authenticate` checks the entered PIN
-against every active worker's hash (no name/ID picker), so a failed attempt
-can't be tied to a specific worker — only to "this browser/device typed a
-wrong PIN." Decision: lock by device/session (cookie-based attempt counter),
-auto-expiring after a cooldown. No admin-unlock step, no schema tied to
-workers — avoids listing employee names on the public kiosk page, which a
-name-picker-first flow would require.
+Design wrinkle: `Authenticate` checks the entered PIN against every active
+worker's hash (no name/ID picker), so a failed attempt can't be tied to a
+specific worker — only to "this client sent a wrong PIN." A cookie/device
+counter was considered first, but rejected: a scripted attacker's HTTP
+client can simply never persist/resend the cookie, so it provides no real
+protection against automated guessing — only against a human retrying in
+the same browser tab, which is already self-limiting.
+
+Implemented instead (`cmd/web/pinlimiter.go`, `cmd/web/handlers_punch.go`):
+an IP-keyed lockout (`pinLimiter`) plus a fixed per-attempt delay applied
+regardless of outcome (`app.pinCheckDelay`). Workers are cellular-only (no
+job-site wifi — see "Reviewed and OK" below), so carrier-grade NAT means an
+IP can be shared by unrelated workers; the lockout threshold is set high
+(default 10 failures/15 min, tunable in `config.json`) specifically to make
+collateral lockout of a shared connection unlikely while still stopping a
+scripted attacker hammering one PIN space. The flat delay (default 250ms)
+isn't bypassable by clearing cookies/IP and directly slows any brute-force
+attempt. Also added: a per-worker daily punch-in cap (default 3,
+`TimePunchModel.DailyPunchLimit`) so a guessed PIN can't be used to spam
+punch records even before a lockout trips.
 
 ### Low: Session cookie security flags not explicit
 `cmd/web/main.go:55-56` — `scs.New()` uses defaults (`HttpOnly` true,
@@ -56,10 +70,18 @@ beyond a trusted network path.
 coordinates. Acceptable: GPS here is an anti-fraud/audit signal, not an
 access control.
 
+### Low: worker PINs stored and compared in plaintext
+`internal/models/workers.go` (`WorkerModel.Authenticate`) — PINs are stored
+as plain `TEXT` and compared with `==`, not hashed. Unlike admin passwords
+(bcrypt, `internal/models/admins.go`), a DB dump reveals every worker's PIN
+directly. Lower severity than it sounds: PINs are short by design (a phone
+kiosk numeric entry, not a real password) and the DB isn't otherwise
+exposed, but worth hashing for defense in depth if this is ever revisited.
+Not addressed by the IP-lockout/delay work above, which only slows guessing
+attempts — it doesn't protect the PIN at rest.
+
 ## Reviewed and OK
 
-- **PIN hashing/comparison** — bcrypt with constant-time compare, no timing
-  attack surface (`internal/models/workers.go`).
 - **SQL injection** — all queries use parameterized placeholders (`?`), no
   string concatenation, across all model files.
 - **XSS** — templates use `html/template` (auto-escaping), no

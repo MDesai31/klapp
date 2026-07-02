@@ -3,6 +3,7 @@
 *.pem
 
 # go
+/config.json
 /db/*.db
 /db/*.db-shm
 /db/*.db-wal

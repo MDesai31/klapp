@@ -101,6 +101,11 @@ func formatDuration(d time.Duration) string {
 
 type TimePunchModel struct {
 	DB *sql.DB
+
+	// DailyPunchLimit caps how many punch-ins a single worker can start in
+	// one calendar day. Zero (the default, used by every test that builds
+	// a TimePunchModel literal directly) means no limit.
+	DailyPunchLimit int
 }
 
 // payPeriodAnchor is the start of a known pay period (a Monday). Pay
@@ -214,6 +219,17 @@ func (m *TimePunchModel) PunchIn(workerID int, lat, lon *float64, now time.Time)
 
 	day := now.Format("2006-01-02")
 	payPeriod := payPeriodStart(now).Format("2006-01-02")
+
+	if m.DailyPunchLimit > 0 {
+		var count int
+		if err := m.DB.QueryRow(`SELECT COUNT(*) FROM time_punches WHERE worker_id = ? AND day = ?`,
+			workerID, day).Scan(&count); err != nil {
+			return 0, err
+		}
+		if count >= m.DailyPunchLimit {
+			return 0, ErrDailyLimitExceeded
+		}
+	}
 
 	stmt := `INSERT INTO time_punches (worker_id, pay_period, day, start_time, start_lat, start_lon)
 		VALUES (?, ?, ?, ?, ?, ?)`

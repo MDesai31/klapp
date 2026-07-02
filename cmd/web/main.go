@@ -27,15 +27,24 @@ type application struct {
 	catalog        *models.CatalogModel
 	templateCache  map[string]*template.Template
 	sessionManager *scs.SessionManager
+	pinLimiter     *pinLimiter
+	pinCheckDelay  time.Duration
 }
 
 func main() {
 	addr := flag.String("addr", ":4000", "worker site HTTP network address")
 	adminAddr := flag.String("admin-addr", ":8082", "admin site HTTP network address (LAN/WireGuard only - do not expose publicly)")
 	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", "SQLite data source name")
+	configPath := flag.String("config", "config.json", "path to JSON config file (optional; defaults used if missing, see config.example.json)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	cfg, err := loadConfig(*configPath)
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 
 	sqlDB, err := openDB(*dsn)
 	if err != nil {
@@ -59,16 +68,26 @@ func main() {
 	sessionManager.Lifetime = 30 * 24 * time.Hour
 
 	app := &application{
-		logger:         logger,
-		workers:        &models.WorkerModel{DB: sqlDB},
-		timePunches:    &models.TimePunchModel{DB: sqlDB},
+		logger:  logger,
+		workers: &models.WorkerModel{DB: sqlDB},
+		timePunches: &models.TimePunchModel{
+			DB:              sqlDB,
+			DailyPunchLimit: cfg.DailyPunchLimit,
+		},
 		admins:         &models.AdminModel{DB: sqlDB},
 		customers:      &models.CustomerModel{DB: sqlDB},
 		invoices:       &models.InvoiceModel{DB: sqlDB},
 		catalog:        &models.CatalogModel{DB: sqlDB},
 		templateCache:  templateCache,
 		sessionManager: sessionManager,
+		pinLimiter: newPinLimiter(
+			cfg.PinLockoutThreshold,
+			time.Duration(cfg.PinLockoutWindowMinutes)*time.Minute,
+			time.Duration(cfg.PinLockoutCooldownMinutes)*time.Minute,
+		),
+		pinCheckDelay: time.Duration(cfg.PinCheckDelayMs) * time.Millisecond,
 	}
+	go app.pinLimiter.cleanupLoop()
 
 	errc := make(chan error, 2)
 

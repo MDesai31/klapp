@@ -26,7 +26,7 @@ func (app *application) termsAndConditions(w http.ResponseWriter, r *http.Reques
 func (app *application) punchStatus(w http.ResponseWriter, r *http.Request) {
 	pin := r.PostFormValue("pin")
 
-	worker, err := app.workers.Authenticate(pin)
+	worker, err := app.authenticateWorker(r, pin)
 	if err != nil {
 		app.showInvalidPIN(w, r, "punch.tmpl", err)
 		return
@@ -48,7 +48,7 @@ func (app *application) punchStatus(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) punchIn(w http.ResponseWriter, r *http.Request) {
 	pin := r.PostFormValue("pin")
-	worker, err := app.workers.Authenticate(pin)
+	worker, err := app.authenticateWorker(r, pin)
 	if err != nil {
 		app.showInvalidPIN(w, r, "punch.tmpl", err)
 		return
@@ -65,6 +65,12 @@ func (app *application) punchIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = app.timePunches.PunchIn(worker.ID, lat, lon, time.Now())
+	if errors.Is(err, models.ErrDailyLimitExceeded) {
+		spanish := worker.Language != "english"
+		flash := pickMsg(spanish, "Has alcanzado el límite de entradas por hoy.", "You've reached today's punch-in limit.")
+		app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
+		return
+	}
 	if err != nil && !errors.Is(err, models.ErrAlreadyOpen) {
 		app.serverError(w, r, err)
 		return
@@ -82,7 +88,7 @@ func (app *application) punchIn(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) punchOut(w http.ResponseWriter, r *http.Request) {
 	pin := r.PostFormValue("pin")
-	worker, err := app.workers.Authenticate(pin)
+	worker, err := app.authenticateWorker(r, pin)
 	if err != nil {
 		app.showInvalidPIN(w, r, "punch.tmpl", err)
 		return
@@ -117,7 +123,7 @@ func (app *application) punchLateForm(w http.ResponseWriter, r *http.Request) {
 // the time they finished, no location capture.
 func (app *application) punchLate(w http.ResponseWriter, r *http.Request) {
 	pin := r.PostFormValue("pin")
-	worker, err := app.workers.Authenticate(pin)
+	worker, err := app.authenticateWorker(r, pin)
 	if err != nil {
 		app.showInvalidPIN(w, r, "punch_late.tmpl", err)
 		return
@@ -149,7 +155,34 @@ func (app *application) punchLate(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
 }
 
+// authenticateWorker looks up the worker for pin, applying a fixed delay to
+// every check (to slow scripted guessing regardless of outcome) and an IP
+// lockout after repeated failures. See pinlimiter.go.
+func (app *application) authenticateWorker(r *http.Request, pin string) (models.Worker, error) {
+	time.Sleep(app.pinCheckDelay)
+
+	ip := clientIP(r)
+	if !app.pinLimiter.allow(ip) {
+		return models.Worker{}, errPinLockedOut
+	}
+
+	worker, err := app.workers.Authenticate(pin)
+	if err != nil {
+		if errors.Is(err, models.ErrInvalidPIN) {
+			app.pinLimiter.recordFailure(ip)
+		}
+		return models.Worker{}, err
+	}
+
+	app.pinLimiter.recordSuccess(ip)
+	return worker, nil
+}
+
 func (app *application) showInvalidPIN(w http.ResponseWriter, r *http.Request, page string, err error) {
+	if errors.Is(err, errPinLockedOut) {
+		app.render(w, r, http.StatusOK, page, templateData{Spanish: true, Flash: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo."})
+		return
+	}
 	if errors.Is(err, models.ErrInvalidPIN) {
 		// Worker is unknown at this point; default to Spanish since most workers are Spanish-speaking.
 		app.render(w, r, http.StatusOK, page, templateData{Spanish: true, Flash: "PIN no reconocido. Inténtalo de nuevo."})

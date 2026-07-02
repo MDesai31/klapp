@@ -10,6 +10,10 @@ the design.
 - Bootstrap the first admin login: `go run ./cmd/seedadmin -username <name> -password <pw>`
 - DB migrations (goose, embedded) run automatically on startup against `db/klapp.db`
   (gitignored, created on first run)
+- Tunable settings (PIN lockout threshold/window/cooldown, per-attempt delay, daily
+  punch-in cap) live in a JSON config file, flag `-config` (default `config.json`,
+  gitignored; see `config.example.json`). Missing file falls back to built-in
+  defaults — see `cmd/web/config.go`.
 
 ## Conventions
 - Project layout follows `~/go-utils/snippetbox` (app struct in `cmd/web/main.go`,

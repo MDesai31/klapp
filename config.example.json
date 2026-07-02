@@ -1,0 +1,7 @@
+{
+  "pin_lockout_threshold": 10,
+  "pin_lockout_window_minutes": 15,
+  "pin_lockout_cooldown_minutes": 15,
+  "pin_check_delay_ms": 250,
+  "daily_punch_limit": 3
+}

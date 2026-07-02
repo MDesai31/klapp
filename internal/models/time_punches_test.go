@@ -49,6 +49,34 @@ func TestPunchInAndOut(t *testing.T) {
 	}
 }
 
+func TestPunchInDailyLimit(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db, DailyPunchLimit: 3}
+	workerID := mustInsertWorker(t, db, "Manthan", "1234", true)
+
+	now := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
+
+	for i := 0; i < 3; i++ {
+		start := now.Add(time.Duration(i) * time.Hour)
+		if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), start); err != nil {
+			t.Fatalf("PunchIn #%d: %v", i+1, err)
+		}
+		if err := tm.PunchOut(workerID, fptr(40.0), fptr(-73.0), start.Add(10*time.Minute)); err != nil {
+			t.Fatalf("PunchOut #%d: %v", i+1, err)
+		}
+	}
+
+	if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), now.Add(4*time.Hour)); !errors.Is(err, ErrDailyLimitExceeded) {
+		t.Errorf("got error %v, want ErrDailyLimitExceeded", err)
+	}
+
+	// A punch the next day is unaffected - the limit is per calendar day.
+	nextDay := now.AddDate(0, 0, 1)
+	if _, err := tm.PunchIn(workerID, fptr(40.0), fptr(-73.0), nextDay); err != nil {
+		t.Errorf("PunchIn on next day: %v", err)
+	}
+}
+
 func TestPunchInNilCoordsStoresNull(t *testing.T) {
 	db := newTestDB(t)
 	tm := &TimePunchModel{DB: db}

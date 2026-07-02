@@ -13,15 +13,15 @@ func (app *application) adminSummary(w http.ResponseWriter, r *http.Request) {
 		period = models.CurrentPayPeriod(time.Now())
 	}
 
-	rows, err := app.timePunches.PayPeriodSummary(period)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
 	days, err := models.PayPeriodDays(period)
 	if err != nil {
 		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	rows, err := app.timePunches.PayPeriodSummary(period)
+	if err != nil {
+		app.serverError(w, r, err)
 		return
 	}
 	dayLabels := make([]string, len(days))

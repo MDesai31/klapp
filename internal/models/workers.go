@@ -27,7 +27,7 @@ type WorkerModel struct {
 // to look one up for a worker who forgot it. Fine at the expected scale
 // (~15 workers).
 func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
-	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone, hourly_rate, language, require_location FROM workers WHERE active = TRUE`)
+	rows, err := m.DB.Query(`SELECT id, worker_name, pin, COALESCE(phone, ''), hourly_rate, language, require_location FROM workers WHERE active = TRUE`)
 	if err != nil {
 		return Worker{}, err
 	}
@@ -51,7 +51,7 @@ func (m *WorkerModel) Authenticate(pin string) (Worker, error) {
 }
 
 func (m *WorkerModel) Get(id int) (Worker, error) {
-	stmt := `SELECT id, worker_name, pin, phone, hourly_rate, language, active, require_location FROM workers WHERE id = ?`
+	stmt := `SELECT id, worker_name, pin, COALESCE(phone, ''), hourly_rate, language, active, require_location FROM workers WHERE id = ?`
 
 	var w Worker
 	err := m.DB.QueryRow(stmt, id).Scan(&w.ID, &w.WorkerName, &w.PIN, &w.Phone, &w.HourlyRate, &w.Language, &w.Active, &w.RequireLocation)
@@ -68,7 +68,7 @@ func (m *WorkerModel) Get(id int) (Worker, error) {
 // List returns every worker, active or not, for the admin worker
 // management page.
 func (m *WorkerModel) List() ([]Worker, error) {
-	rows, err := m.DB.Query(`SELECT id, worker_name, pin, phone, hourly_rate, language, active, require_location FROM workers ORDER BY worker_name`)
+	rows, err := m.DB.Query(`SELECT id, worker_name, pin, COALESCE(phone, ''), hourly_rate, language, active, require_location FROM workers ORDER BY worker_name`)
 	if err != nil {
 		return nil, err
 	}

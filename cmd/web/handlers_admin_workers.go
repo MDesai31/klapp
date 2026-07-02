@@ -154,6 +154,10 @@ func (app *application) adminToggleWorkerActive(w http.ResponseWriter, r *http.R
 
 	worker, err := app.workers.Get(id)
 	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			app.clientError(w, http.StatusNotFound)
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}

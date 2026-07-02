@@ -32,8 +32,9 @@ the design.
   against `/opt/klapp`'s db — never reuse those ports or that db for ad-hoc testing.
   Use scratch ports/dsn, e.g. `go run ./cmd/web -addr=:14000 -admin-addr=:18082 -dsn="file:/tmp/x.db?_pragma=foreign_keys(1)"`,
   and kill the spawned binary by PID after (`go run`'s child outlives `kill %1`).
-- `workers.phone` is `NOT NULL` but the Go model scans it as a plain `string`; any
-  row inserted by hand (not through the app) needs `phone = ''`, not `NULL`.
+- `workers.phone` is nullable in the schema; the Go model scans it through
+  `COALESCE(phone, '')`, so hand-inserted rows with `NULL` phone are safe, but prefer
+  `phone = ''` for consistency with what the app writes.
 
 ## Key files
 - Worker site handlers: `cmd/web/handlers_punch.go`. Admin site handlers:

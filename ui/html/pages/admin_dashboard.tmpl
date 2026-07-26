@@ -5,11 +5,15 @@
 
 <h1>Today</h1>
 <table>
-<tr><th>Worker</th><th>Status</th></tr>
+<tr><th>Worker</th><th>Status</th><th></th></tr>
 {{range .DashboardRows}}
 <tr{{if not .StartTime.Valid}} class="not-in"{{end}}>
     <td>{{.WorkerName}}</td>
     <td>{{.StatusLabel}}</td>
+    <td>
+    {{$link := .NotifyLink $.NotifyBaseURL}}
+    {{if $link}}<a href="{{$link | safeURL}}">Notify</a>{{end}}
+    </td>
 </tr>
 {{end}}
 </table>

@@ -27,6 +27,7 @@ type templateData struct {
 	Workers             []models.Worker
 	ShowInactiveWorkers bool
 	Punch               *models.TimePunch
+	NotifyBaseURL       string
 
 	// admin site — invoices
 	Invoices    []models.Invoice
@@ -48,6 +49,15 @@ type templateData struct {
 	Flash string
 }
 
+// templateFuncs are helpers exposed to html/template pages.
+var templateFuncs = template.FuncMap{
+	// safeURL marks a server-built URL (e.g. an "sms:" link) as safe to
+	// emit verbatim in an href, bypassing html/template's default
+	// http/https/mailto-only scheme allowlist. Only use it on strings
+	// built from trusted, already-escaped inputs - never raw user input.
+	"safeURL": func(s string) template.URL { return template.URL(s) },
+}
+
 func newTemplateCache() (map[string]*template.Template, error) {
 	cache := map[string]*template.Template{}
 
@@ -59,7 +69,7 @@ func newTemplateCache() (map[string]*template.Template, error) {
 	for _, page := range pages {
 		name := filepath.Base(page)
 
-		ts, err := template.New(name).ParseFiles("./ui/html/base.tmpl", "./ui/html/partials/nav.tmpl", page)
+		ts, err := template.New(name).Funcs(templateFuncs).ParseFiles("./ui/html/base.tmpl", "./ui/html/partials/nav.tmpl", page)
 		if err != nil {
 			return nil, err
 		}

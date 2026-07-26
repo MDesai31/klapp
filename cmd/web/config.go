@@ -27,6 +27,9 @@ type Config struct {
 	// DailyPunchLimit caps how many times a worker can punch in per
 	// calendar day. Zero means no limit.
 	DailyPunchLimit int `json:"daily_punch_limit"`
+	// PunchSiteURL is the worker-facing punch site's public URL, sent in
+	// the admin dashboard's "Notify" text message links.
+	PunchSiteURL string `json:"punch_site_url"`
 }
 
 func defaultConfig() Config {
@@ -36,6 +39,7 @@ func defaultConfig() Config {
 		PinLockoutCooldownMinutes: 15,
 		PinCheckDelayMs:           250,
 		DailyPunchLimit:           3,
+		PunchSiteURL:              "https://work.klauslandscaping.com",
 	}
 }
 

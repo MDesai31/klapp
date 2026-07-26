@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -66,6 +67,9 @@ func (p TimePunch) EndTimeInputValue() string {
 type DashboardRow struct {
 	WorkerID   int
 	WorkerName string
+	Phone      string
+	PIN        string
+	Language   string
 	PunchID    sql.NullInt64
 	StartTime  sql.NullString
 	EndTime    sql.NullString
@@ -89,6 +93,62 @@ func (r DashboardRow) StatusLabel() string {
 		return "?"
 	}
 	return fmt.Sprintf("Out at %s (%s worked)", end.Local().Format("3:04 PM"), formatDuration(end.Sub(start)))
+}
+
+// NotifyLink builds an "sms:" URI, pre-filled with a punch-in or punch-out
+// reminder (whichever the worker currently needs) in their preferred
+// language, addressed to their phone number. Returns "" if the worker has
+// no phone number on file. baseURL is the worker punch site's public URL.
+//
+// The query string uses "?&body=" rather than a plain "?body=", since some
+// iOS versions only honor "&body=" - the combined form is a well-known
+// cross-platform trick that satisfies both parsers.
+func (r DashboardRow) NotifyLink(baseURL string) string {
+	phone := smsPhone(r.Phone)
+	if phone == "" {
+		return ""
+	}
+
+	punchedIn := r.StartTime.Valid && !r.EndTime.Valid
+	spanish := r.Language != "english"
+
+	var text string
+	switch {
+	case punchedIn && spanish:
+		text = fmt.Sprintf("Hola %s, por favor marca tu salida en: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	case punchedIn:
+		text = fmt.Sprintf("Hello %s, please punch out at: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	case spanish:
+		text = fmt.Sprintf("Hola %s, por favor marca tu entrada en: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	default:
+		text = fmt.Sprintf("Hello %s, please punch in at: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	}
+
+	return fmt.Sprintf("sms:%s?&body=%s", phone, smsEscape(text))
+}
+
+// smsEscape percent-encodes text for use in an sms: URI's body param.
+// url.QueryEscape encodes spaces as '+', which is correct for form bodies
+// but renders as a literal '+' rather than a space in a text message body -
+// so spaces need %20 instead.
+func smsEscape(text string) string {
+	return strings.ReplaceAll(url.QueryEscape(text), "+", "%20")
+}
+
+// smsPhone strips everything but digits and a leading '+' from a
+// free-typed phone number, so it's safe to drop into an sms: URI.
+func smsPhone(phone string) string {
+	var b strings.Builder
+	for i, c := range phone {
+		if c == '+' && i == 0 {
+			b.WriteRune(c)
+			continue
+		}
+		if c >= '0' && c <= '9' {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
 }
 
 // formatDuration renders a duration as "Xh Ym", or just "Ym" under an hour.
@@ -407,7 +467,7 @@ func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error
 // DashboardStatus reports every active worker's punch status for the
 // given day ("2006-01-02") - in, out, or not punched in at all.
 func (m *TimePunchModel) DashboardStatus(day string) ([]DashboardRow, error) {
-	stmt := `SELECT w.id, w.worker_name, tp.id, tp.start_time, tp.end_time
+	stmt := `SELECT w.id, w.worker_name, COALESCE(w.phone, ''), w.pin, w.language, tp.id, tp.start_time, tp.end_time
 		FROM workers w
 		LEFT JOIN time_punches tp ON tp.worker_id = w.id AND tp.day = ?
 		WHERE w.active = TRUE
@@ -422,7 +482,7 @@ func (m *TimePunchModel) DashboardStatus(day string) ([]DashboardRow, error) {
 	var out []DashboardRow
 	for rows.Next() {
 		var r DashboardRow
-		if err := rows.Scan(&r.WorkerID, &r.WorkerName, &r.PunchID, &r.StartTime, &r.EndTime); err != nil {
+		if err := rows.Scan(&r.WorkerID, &r.WorkerName, &r.Phone, &r.PIN, &r.Language, &r.PunchID, &r.StartTime, &r.EndTime); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

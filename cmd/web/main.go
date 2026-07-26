@@ -29,6 +29,7 @@ type application struct {
 	sessionManager *scs.SessionManager
 	pinLimiter     *pinLimiter
 	pinCheckDelay  time.Duration
+	punchSiteURL   string
 }
 
 func main() {
@@ -86,6 +87,7 @@ func main() {
 			time.Duration(cfg.PinLockoutCooldownMinutes)*time.Minute,
 		),
 		pinCheckDelay: time.Duration(cfg.PinCheckDelayMs) * time.Millisecond,
+		punchSiteURL:  cfg.PunchSiteURL,
 	}
 	go app.pinLimiter.cleanupLoop()
 

@@ -53,5 +53,5 @@ func (app *application) adminDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.render(w, r, http.StatusOK, "admin_dashboard.tmpl", templateData{DashboardRows: rows})
+	app.render(w, r, http.StatusOK, "admin_dashboard.tmpl", templateData{DashboardRows: rows, NotifyBaseURL: app.punchSiteURL})
 }

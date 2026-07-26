@@ -9,8 +9,6 @@ func (app *application) routes() http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
 
 	mux.HandleFunc("GET /{$}", app.punchForm)
-	mux.HandleFunc("GET /privacy", app.privacyPolicy)
-	mux.HandleFunc("GET /terms", app.termsAndConditions)
 	mux.HandleFunc("GET /punch", app.punchForm)
 	mux.HandleFunc("POST /punch", app.punchStatus)
 	mux.HandleFunc("POST /punch/in", app.punchIn)

@@ -5,9 +5,13 @@
 
 <h1>Today</h1>
 <table>
-<tr><th>Worker</th><th>Status</th><th></th></tr>
+<tr><th><input type="checkbox" id="notify-select-all"></th><th>Worker</th><th>Status</th><th></th></tr>
 {{range .DashboardRows}}
 <tr{{if not .StartTime.Valid}} class="not-in"{{end}}>
+    <td>
+    {{$phone := .SMSPhone}}
+    {{if $phone}}<input type="checkbox" class="notify-check" value="{{$phone}}">{{end}}
+    </td>
     <td>{{.WorkerName}}</td>
     <td>{{.StatusLabel}}</td>
     <td>
@@ -17,4 +21,42 @@
 </tr>
 {{end}}
 </table>
+<button type="button" id="notify-selected" disabled>Notify Selected</button>
+
+<script>
+(function () {
+    var baseURL = "{{$.NotifyBaseURL}}";
+    var checks = document.querySelectorAll(".notify-check");
+    var selectAll = document.getElementById("notify-select-all");
+    var button = document.getElementById("notify-selected");
+
+    function updateButton() {
+        var any = false;
+        checks.forEach(function (c) {
+            if (c.checked) any = true;
+        });
+        button.disabled = !any;
+    }
+
+    checks.forEach(function (c) {
+        c.addEventListener("change", updateButton);
+    });
+
+    selectAll.addEventListener("change", function () {
+        checks.forEach(function (c) {
+            c.checked = selectAll.checked;
+        });
+        updateButton();
+    });
+
+    button.addEventListener("click", function () {
+        var phones = [];
+        checks.forEach(function (c) {
+            if (c.checked) phones.push(c.value);
+        });
+        if (phones.length === 0) return;
+        window.location.href = "sms:" + phones.join(",") + "?&body=" + encodeURIComponent(baseURL);
+    });
+})();
+</script>
 {{end}}

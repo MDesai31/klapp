@@ -127,6 +127,12 @@ func (r DashboardRow) NotifyLink(baseURL string) string {
 	return fmt.Sprintf("sms:%s?&body=%s", phone, smsEscape(text))
 }
 
+// SMSPhone returns the worker's phone number normalized for use in an sms:
+// URI (digits and a leading '+' only), or "" if none is on file.
+func (r DashboardRow) SMSPhone() string {
+	return smsPhone(r.Phone)
+}
+
 // smsEscape percent-encodes text for use in an sms: URI's body param.
 // url.QueryEscape encodes spaces as '+', which is correct for form bodies
 // but renders as a literal '+' rather than a space in a text message body -

@@ -27,11 +27,17 @@ the design.
   migrations applied fresh each run. No shared test DB, no race conditions, tests
   can run in parallel.
 
+## Skills
+`.claude/skills/` holds task guides Claude loads on demand: `codebase-map`
+(finding things without reading whole files), `feature-slice` (conventions for a
+change spanning model/handler/route/template), `smoke-test` (scripted local run
++ curl helpers), `deploy-ops` (systemd, /opt/klapp, update.sh).
+
 ## Manual/local testing
 - `klapp.service` (systemd) already runs the real binary on default ports `:4000`/`:8082`
   against `/opt/klapp`'s db — never reuse those ports or that db for ad-hoc testing.
-  Use scratch ports/dsn, e.g. `go run ./cmd/web -addr=:14000 -admin-addr=:18082 -dsn="file:/tmp/x.db?_pragma=foreign_keys(1)"`,
-  and kill the spawned binary by PID after (`go run`'s child outlives `kill %1`).
+  `.claude/skills/smoke-test/scripts/scratch-up.sh` starts a seeded throwaway
+  instance on `:14000`/`:18082` instead; `scratch-down.sh` stops it.
 - `workers.phone` is nullable in the schema; the Go model scans it through
   `COALESCE(phone, '')`, so hand-inserted rows with `NULL` phone are safe, but prefer
   `phone = ''` for consistency with what the app writes.

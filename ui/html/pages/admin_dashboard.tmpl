@@ -3,14 +3,16 @@
 {{define "main"}}
 {{template "nav" .}}
 
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
 <h1>Today</h1>
+<form method="POST" action="/admin/punch/bulk">
 <table>
-<tr><th><input type="checkbox" id="notify-select-all"></th><th>Worker</th><th>Status</th><th></th></tr>
+<tr><th><input type="checkbox" id="punch-select-all"></th><th>Worker</th><th>Status</th><th></th></tr>
 {{range .DashboardRows}}
 <tr{{if not .StartTime.Valid}} class="not-in"{{end}}>
     <td>
-    {{$phone := .SMSPhone}}
-    {{if $phone}}<input type="checkbox" class="notify-check" value="{{$phone}}">{{end}}
+    <input type="checkbox" class="punch-check" name="worker_id" value="{{.WorkerID}}" data-state="{{if .PunchedIn}}in{{else}}out{{end}}">
     </td>
     <td>{{.WorkerName}}</td>
     <td>{{.StatusLabel}}</td>
@@ -21,21 +23,42 @@
 </tr>
 {{end}}
 </table>
-<button type="button" id="notify-selected" disabled>Notify Selected</button>
+<p id="punch-mixed" class="flash" hidden>Some selected workers are punched in and some aren't. Select one group or the other.</p>
+<button type="submit" id="punch-selected" name="action" value="in" disabled>Punch Selected</button>
+</form>
 
 <script>
 (function () {
-    var baseURL = "{{$.NotifyBaseURL}}";
-    var checks = document.querySelectorAll(".notify-check");
-    var selectAll = document.getElementById("notify-select-all");
-    var button = document.getElementById("notify-selected");
+    var checks = document.querySelectorAll(".punch-check");
+    var selectAll = document.getElementById("punch-select-all");
+    var button = document.getElementById("punch-selected");
+    var mixed = document.getElementById("punch-mixed");
 
+    // The whole selection gets one action, so the button follows the state
+    // of what's selected: punch in workers who are out, punch out workers
+    // who are in, and refuse a selection that mixes the two.
     function updateButton() {
-        var any = false;
+        var selectedIn = false;
+        var selectedOut = false;
         checks.forEach(function (c) {
-            if (c.checked) any = true;
+            if (!c.checked) return;
+            if (c.dataset.state === "in") selectedIn = true;
+            else selectedOut = true;
         });
-        button.disabled = !any;
+
+        mixed.hidden = !(selectedIn && selectedOut);
+
+        if (selectedIn === selectedOut) {
+            // Nothing selected, or a mix of both.
+            button.disabled = true;
+            button.value = "in";
+            button.textContent = "Punch Selected";
+            return;
+        }
+
+        button.disabled = false;
+        button.value = selectedIn ? "out" : "in";
+        button.textContent = selectedIn ? "Punch Out Selected" : "Punch In Selected";
     }
 
     checks.forEach(function (c) {
@@ -47,15 +70,6 @@
             c.checked = selectAll.checked;
         });
         updateButton();
-    });
-
-    button.addEventListener("click", function () {
-        var phones = [];
-        checks.forEach(function (c) {
-            if (c.checked) phones.push(c.value);
-        });
-        if (phones.length === 0) return;
-        window.location.href = "sms:" + phones.join(",") + "?&body=" + encodeURIComponent(baseURL);
     });
 })();
 </script>

@@ -36,6 +36,7 @@ func (app *application) adminRoutes() http.Handler {
 	protected := http.NewServeMux()
 	protected.HandleFunc("GET /admin/{$}", app.adminDashboard)
 	protected.HandleFunc("POST /admin/logout", app.adminLogout)
+	protected.HandleFunc("POST /admin/punch/bulk", app.adminBulkPunch)
 	protected.HandleFunc("GET /admin/timesheet", app.adminTimesheet)
 	protected.HandleFunc("GET /admin/summary", app.adminSummary)
 	protected.HandleFunc("GET /admin/punches/new", app.adminAddPunchForm)

@@ -95,6 +95,12 @@ func (r DashboardRow) StatusLabel() string {
 	return fmt.Sprintf("Out at %s (%s worked)", end.Local().Format("3:04 PM"), formatDuration(end.Sub(start)))
 }
 
+// PunchedIn reports whether the worker is currently on the clock, i.e. has
+// a punch for the day that hasn't been closed yet.
+func (r DashboardRow) PunchedIn() bool {
+	return r.StartTime.Valid && !r.EndTime.Valid
+}
+
 // NotifyLink builds an "sms:" URI, pre-filled with a punch-in or punch-out
 // reminder (whichever the worker currently needs) in their preferred
 // language, addressed to their phone number. Returns "" if the worker has
@@ -109,7 +115,7 @@ func (r DashboardRow) NotifyLink(baseURL string) string {
 		return ""
 	}
 
-	punchedIn := r.StartTime.Valid && !r.EndTime.Valid
+	punchedIn := r.PunchedIn()
 	spanish := r.Language != "english"
 
 	var text string

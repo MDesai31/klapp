@@ -11,3 +11,10 @@
 /cmd/seedadmin/seedadmin
 /web
 /seedadmin
+
+# secrets
+.env
+
+# Next.js-era leftovers (working trees predating the Go rewrite)
+.next/
+node_modules/

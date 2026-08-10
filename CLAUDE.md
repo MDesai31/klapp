@@ -43,3 +43,5 @@ the design.
 - There is exactly one "dashboard": `/admin` (`admin_dashboard.tmpl`), backed by
   `models.DashboardStatus`/`DashboardRow` in `internal/models/time_punches.go`.
   The worker-facing page is `punch.tmpl` ("Punch"), not a dashboard.
+
+@docs/memory/MEMORY.md

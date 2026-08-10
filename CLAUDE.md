@@ -4,6 +4,16 @@ LAN/WireGuard-only admin site on a second port) and `cmd/invoice` (LAN/WireGuard
 invoice submission). See `docs/design/refactor.md` and `docs/design/time_reporting_plan.md`
 for the design.
 
+## Docs
+- `docs/design/` — plans + rationale: `refactor.md` (why Go), `time_reporting_plan.md`
+  (punch/timesheet design), `quickbooks_plan.md` (QBO integration, not built)
+- `docs/reference/` — living system docs: `invoices.md` (invoice system as built),
+  `security.md` (security review — open issues + rejected alternatives)
+- `docs/guides/` — human how-tos: `admin-guide.md` (admin site, tab by tab)
+- `docs/memory/` — shared repo facts, index auto-imported below; `docs/project-tracking/` —
+  actions/decisions/ideas/resolved (workspace-os; see its README for the record schema)
+- `README.md` — dev setup + production deployment; `deploy/` — systemd units, Caddyfile, scripts
+
 ## Running
 - Worker site: `go run ./cmd/web` (default `:4000`)
 - Admin site: started by the same binary on a second port (default `:8082`,

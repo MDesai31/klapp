@@ -179,3 +179,26 @@ New `cmd/printsched` builds a pay-period payload (`internal/schedule`) and posts
 `schedule_listener/` on the home server, which renders PDFs with reportlab
 (`build_schedule.py`, unit-tested). Design in `docs/design/printPlan.md`.
 Thomas's work on `refactor/go-rewrite`; imported at integration into main.
+### A-20260809-pin-echoed-in-html — Stop round-tripping the worker PIN through page HTML
+- Workstream: security
+- Status: done
+- Created: 2026-08-09
+
+High-severity from `docs/reference/security.md`: after auth, the PIN was written into a hidden
+form field (`punch.tmpl`) and resubmitted on punch — visible in page source, history, proxy
+logs. Fixed by holding the worker ID in a short-lived scs session (`punch_session`, 30 min);
+punch in/out resolve the worker server-side and fall back to the PIN form on expiry or
+deactivation. TDD'd via handler tests driving the real router.
+- Completed: 2026-08-10
+- Commit: 29fb9d69
+
+### A-20260809-pin-field-plaintext — Use a password input for the PIN field in the admin panel
+- Workstream: security
+- Status: done
+- Created: 2026-08-09
+
+Medium from `docs/reference/security.md`: PIN inputs in `admin_workers.tmpl` and
+`admin_edit_worker.tmpl` were `type="text"`, visible on-screen while an admin entered/edited
+them. Now `type="password"`, guarded by a template render test.
+- Completed: 2026-08-10
+- Commit: 29fb9d69

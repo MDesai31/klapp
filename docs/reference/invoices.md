@@ -95,7 +95,7 @@ Three new tabs in the admin nav:
 - Read-only display of all fields including job list and material list
 - **Submit & mark reviewed** button → sends email via msmtp to `mylawncut@aol.com` + sets `reviewed = TRUE`
 - Button grays out (disabled) once already reviewed
-- QuickBooks integration: planned — see `docs/quickbooks_plan.md`
+- QuickBooks integration: planned — see `docs/design/quickbooks_plan.md`
 
 ### Customers tab (`/admin/customers`)
 
@@ -115,7 +115,7 @@ Manages the autocomplete lists used on the invoice form:
 
 ## Email delivery (msmtp)
 
-The Submit button calls `msmtp --account=default mylawncut@aol.com`. msmtp must be installed and configured on the server before this works — see setup instructions in `todo.md`. The email failure is logged but does not block marking the invoice as reviewed.
+The Submit button calls `msmtp --account=default mylawncut@aol.com`. msmtp must be installed and configured on the server before this works — see the msmtp setup section in `README.md`. The email failure is logged but does not block marking the invoice as reviewed.
 
 ---
 
@@ -131,5 +131,5 @@ The Submit button calls `msmtp --account=default mylawncut@aol.com`. msmtp must 
 
 ## Not yet built
 
-- **QuickBooks integration** — see `docs/quickbooks_plan.md`
+- **QuickBooks integration** — see `docs/design/quickbooks_plan.md`
 - `cmd/invoice` is not yet in the systemd unit — add a second `ExecStart` line or a separate service file pointing to the invoice binary

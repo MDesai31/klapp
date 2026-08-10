@@ -1,13 +1,18 @@
 ## Project
-Klaus Field Log — Go + SQLite. Two binaries: the public worker punch site and the
-LAN/WireGuard-only admin site. See `refactor.md` and `time_reporting_plan.md` for
-the design.
+Klaus Field Log — Go + SQLite. Two binaries: `cmd/web` (public worker punch site + the
+LAN/WireGuard-only admin site on a second port) and `cmd/invoice` (LAN/WireGuard-only
+invoice submission). See `docs/design/refactor.md` and `docs/design/time_reporting_plan.md`
+for the design.
 
 ## Running
 - Worker site: `go run ./cmd/web` (default `:4000`)
 - Admin site: started by the same binary on a second port (default `:8082`,
   flag `-admin-addr`), bound to all interfaces so it's reachable over LAN and WireGuard
+- Invoice site: `go run ./cmd/invoice` (default `:8083`, LAN/VPN-only; shares the same
+  DB and embedded migrations — goose is idempotent, both binaries can run at once)
 - Bootstrap the first admin login: `go run ./cmd/seedadmin -username <name> -password <pw>`
+- Production deploy: `bash deploy/update.sh` (builds both binaries, syncs ui/, restarts
+  `klapp` + `klapp-invoice` services); full first-time setup in README § Production deployment
 - DB migrations (goose, embedded) run automatically on startup against `db/klapp.db`
   (gitignored, created on first run)
 - Tunable settings (PIN lockout threshold/window/cooldown, per-attempt delay, daily
@@ -28,7 +33,8 @@ the design.
   can run in parallel.
 
 ## Manual/local testing
-- `klapp.service` (systemd) already runs the real binary on default ports `:4000`/`:8082`
+- `klapp.service` / `klapp-invoice.service` (systemd) already run the real binaries on
+  default ports `:4000`/`:8082`/`:8083`
   against `/opt/klapp`'s db — never reuse those ports or that db for ad-hoc testing.
   Use scratch ports/dsn, e.g. `go run ./cmd/web -addr=:14000 -admin-addr=:18082 -dsn="file:/tmp/x.db?_pragma=foreign_keys(1)"`,
   and kill the spawned binary by PID after (`go run`'s child outlives `kill %1`).
@@ -43,3 +49,5 @@ the design.
 - There is exactly one "dashboard": `/admin` (`admin_dashboard.tmpl`), backed by
   `models.DashboardStatus`/`DashboardRow` in `internal/models/time_punches.go`.
   The worker-facing page is `punch.tmpl` ("Punch"), not a dashboard.
+
+@docs/memory/MEMORY.md

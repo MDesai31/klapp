@@ -10,8 +10,8 @@ moves the record to `resolved.md`. Records use the action template from the conv
 
 Invoice "Submit & mark reviewed" shells out to `msmtp` targeting `mylawncut@aol.com`; until
 msmtp is installed and configured on the server the email silently fails (invoice still marks
-reviewed, with a flash). Setup steps live in `README.md` § msmtp setup / `todo.md` (AOL
-app-specific password required with 2FA). Restart `klapp-invoice.service` after.
+reviewed, with a flash). Setup steps live in `README.md` § msmtp setup (AOL app-specific
+password required with 2FA). Restart `klapp-invoice.service` after.
 
 ### A-20260809-sms-punchout-notifications — SMS punch-out reminders (5 PM auto + manual admin trigger)
 - Workstream: time-tracking
@@ -28,7 +28,7 @@ in flight: `feature/sms-notifications` branch and the Twilio A2P 10DLC registrat
 - Status: open
 - Created: 2026-08-09
 
-High-severity from `docs/security.md`: after auth, the PIN is written into a hidden form field
+High-severity from `docs/reference/security.md`: after auth, the PIN is written into a hidden form field
 (`punch.tmpl`) and resubmitted on punch — visible in page source, history, proxy logs. Fix:
 hold `workerID` server-side (session) instead; the punch site currently has no session
 middleware at all.
@@ -38,7 +38,7 @@ middleware at all.
 - Status: open
 - Created: 2026-08-09
 
-Medium from `docs/security.md`: admin forms (worker create/edit, punch edit) have no CSRF
+Medium from `docs/reference/security.md`: admin forms (worker create/edit, punch edit) have no CSRF
 tokens. Low real-world risk (WireGuard/LAN-only) but cheap defense in depth (e.g. `gorilla/csrf`).
 
 ### A-20260809-pin-field-plaintext — Use a password input for the PIN field in the admin panel
@@ -46,5 +46,5 @@ tokens. Low real-world risk (WireGuard/LAN-only) but cheap defense in depth (e.g
 - Status: open
 - Created: 2026-08-09
 
-Medium from `docs/security.md`: `admin_workers.tmpl` PIN input is `type="text"`, visible
+Medium from `docs/reference/security.md`: `admin_workers.tmpl` PIN input is `type="text"`, visible
 on-screen while an admin enters/edits it.

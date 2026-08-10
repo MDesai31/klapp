@@ -28,7 +28,7 @@ Future intents — captured by `/project-plan`, not started. Scope before acting
 - Workstream: time-tracking
 - Priority: low
 - Intended start: someday
-- Why/context: from `todo.md` Nice-to-have (verbatim, sentence trails off: "if a worker punched out, outside of Mary"). GPS is an audit signal, not access control — see `docs/security.md`.
+- Why/context: from `todo.md` Nice-to-have (verbatim, sentence trails off: "if a worker punched out, outside of Mary"). GPS is an audit signal, not access control — see `docs/reference/security.md`.
 - To start, future-us needs: the locations-of-interest list and radius config; per-worker `require_location` flag already exists.
 
 ### optimize-claude-md — Slim CLAUDE.md so sessions need less context
@@ -56,7 +56,7 @@ Future intents — captured by `/project-plan`, not started. Scope before acting
 - Workstream: admin
 - Priority: someday
 - Intended start: someday
-- Why/context: carried over from Next.js-era `docs/ideas.md`; the original design (`docs/time_reporting_plan.md`) imagined per-worker PDF pay-period reports emailed and printed via `lp`.
+- Why/context: carried over from Next.js-era `docs/ideas.md`; the original design (`docs/design/time_reporting_plan.md`) imagined per-worker PDF pay-period reports emailed and printed via `lp`.
 - To start, future-us needs: pick format(s); Summary tab already computes the pay-period grid.
 
 ### offline-pwa — Punch without cell signal, sync later

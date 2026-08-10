@@ -9,9 +9,10 @@ Auth.js v5 beta + Postgres, built around a `JobLog` work record with an explicit
 billing in the MVP" rule and hours derived in `src/lib/hours.ts`. That code is preserved on the
 `legacy/nextjs` branch; main was fast-forwarded to Thomas's Go + SQLite rewrite
 ([[D-20260809-promote-go-rewrite-to-main]], rationale in [[D-20260809-go-rewrite]] /
-`docs/refactor.md`).
+`docs/design/refactor.md`).
 
 Treat any prior knowledge from that era as stale: the Go app is punch/timesheet-centric, **has**
 invoices with billing intent (QBO planned — [[quickbooks-plan]]), uses SQLite not Postgres, and
-session auth exists only on the admin and invoice sites. Old docs (`docs/ideas.md` in
-particular) predate the rewrite — many entries there are implemented or obsolete.
+session auth exists only on the admin and invoice sites. The era's brainstorm doc
+(`docs/ideas.md`) was removed at adoption — its still-relevant entries live in
+`docs/project-tracking/ideas.md`; the file itself survives on `legacy/nextjs`.

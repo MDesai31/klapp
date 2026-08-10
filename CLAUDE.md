@@ -1,6 +1,6 @@
 ## Project
 Klaus Field Log — Go + SQLite. Two binaries: the public worker punch site and the
-LAN/WireGuard-only admin site. See `refactor.md` and `time_reporting_plan.md` for
+LAN/WireGuard-only admin site. See `docs/design/refactor.md` and `docs/design/time_reporting_plan.md` for
 the design.
 
 ## Running

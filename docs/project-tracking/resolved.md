@@ -10,7 +10,7 @@ ref). Append-only.
 - Completed: 2026-06-17
 - Commit: 191c358a (plus plan docs cc0b1499, 9b13880e, 128020cd)
 
-Phase-1 rewrite per `docs/refactor.md` and `docs/time_reporting_plan.md`: cmd/web with worker
+Phase-1 rewrite per `docs/design/refactor.md` and `docs/design/time_reporting_plan.md`: cmd/web with worker
 punch site + admin site, internal/models, goose migrations, html/template UI.
 Imported from git history by /tracking-adopt git.
 
@@ -23,7 +23,7 @@ Imported from git history by /tracking-adopt git.
 
 Generalized systemd deploy to /opt/klapp, pointed the Caddyfile at work.klauslandscaping.com,
 added Caddy bootstrap and the binary-only update script. 442b0fae also switched worker PINs to
-plaintext storage (noted in `docs/security.md` as a Low open issue).
+plaintext storage (noted in `docs/reference/security.md` as a Low open issue).
 Imported from git history by /tracking-adopt git.
 
 ### A-20260624-admin-worker-management — Worker editing, unique PINs, deactivated-worker hiding
@@ -66,7 +66,7 @@ Imported from git history by /tracking-adopt git.
 - Completed: 2026-06-26
 - Commit: 3bc54642, 146ebc94, 0e7e66f9, 69a5ce90
 
-Per `docs/invoices.md`: new cmd/invoice binary (:8083), migrations 0005–0008 (customers,
+Per `docs/reference/invoices.md`: new cmd/invoice binary (:8083), migrations 0005–0008 (customers,
 job_descriptions, materials, invoices + junctions), admin Invoices/Customers/Catalog tabs,
 msmtp email delivery, model tests. Deploy scripts and service units updated.
 Imported from git history by /tracking-adopt git.
@@ -91,7 +91,7 @@ Imported from git history by /tracking-adopt git.
 - Completed: 2026-06-29
 - Commit: b785f88d, 3b7df0fe
 
-README deployment guide (symlinked systemd units, Caddy, msmtp) and `admin-guide.md` covering
+README deployment guide (symlinked systemd units, Caddy, msmtp) and `docs/guides/admin-guide.md` covering
 every tab and common tasks.
 Imported from git history by /tracking-adopt git.
 

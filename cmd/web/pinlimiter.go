@@ -16,7 +16,7 @@ import (
 var errPinLockedOut = errors.New("too many failed PIN attempts from this address")
 
 // pinLimiter throttles PIN guessing on the public punch site by source IP.
-// The punch site sits on cellular-only traffic (see docs/security.md), so
+// The punch site sits on cellular-only traffic (see docs/reference/security.md), so
 // carrier-grade NAT means many unrelated workers can share one IP - the
 // threshold is set high enough in config that a handful of mistyped PINs
 // across a shared connection won't trip it, while a scripted attacker

@@ -19,4 +19,4 @@ wifi), so carrier-grade NAT shapes both calls:
   IP can change mid-session. GPS lat/lon captured on punch is the anti-fraud signal instead.
 
 The lockout threshold is deliberately high because NAT also means one locked IP can collateral-
-lock unrelated workers. Full review: `docs/security.md`.
+lock unrelated workers. Full review: `docs/reference/security.md`.

@@ -7,11 +7,11 @@ ID. Never rewrite history — only add. Records use the decision template from t
 - Workstream: ops
 - Created: 2026-08-09
 - Status: accepted
-- Rationale: Next.js 16 + Auth.js v5 beta + Prisma 6 churn (breaking majors, hundreds of npm deps, framework complexity) outweighed the needs of a small internal CRUD tool. Go's 1.x compatibility guarantee, SQLite as a single file, html/template, single-binary deploy — stable for years without forced upgrades. Full rationale in `docs/refactor.md`.
+- Rationale: Next.js 16 + Auth.js v5 beta + Prisma 6 churn (breaking majors, hundreds of npm deps, framework complexity) outweighed the needs of a small internal CRUD tool. Go's 1.x compatibility guarantee, SQLite as a single file, html/template, single-binary deploy — stable for years without forced upgrades. Full rationale in `docs/design/refactor.md`.
 - Consequences: no ORM (raw SQL), no worker sessions/cookies, no CSRF on worker path, no separate DB server; tests run parallel on throwaway SQLite files.
 - Spawns: none
 
-Adopted from `docs/refactor.md` § Why (decision originally made ~2026-06-16 by Thomas; recorded at adoption time).
+Adopted from `docs/design/refactor.md` § Why (decision originally made ~2026-06-16 by Thomas; recorded at adoption time).
 
 ### D-20260809-promote-go-rewrite-to-main — Fast-forward main to refactor/go-rewrite
 - Workstream: ops
@@ -29,12 +29,12 @@ Adopted from `docs/refactor.md` § Why (decision originally made ~2026-06-16 by 
 - Consequences: defense is connection-shaped, not account-shaped (PINs can't be attributed to a worker on failure — see [[worker-auth-model]]).
 - Spawns: none
 
-Adopted from `docs/security.md` (implemented in e88fc117).
+Adopted from `docs/reference/security.md` (implemented in e88fc117).
 
 ### D-20260809-missed-punch-admin-corrects — Missed punch-ins are admin-corrected, not worker-self-entered
 - Workstream: time-tracking
 - Created: 2026-08-09
 - Status: accepted
-- Rationale: letting workers back-enter their own start time is the path of least resistance and would devolve into nobody punching in live. Having to ask the admin (and be lightly scolded) disincentivizes forgetting. Option 1 vs Option 2 analysis in `docs/time_reporting_plan.md` § Worker Missed Punch In.
+- Rationale: letting workers back-enter their own start time is the path of least resistance and would devolve into nobody punching in live. Having to ask the admin (and be lightly scolded) disincentivizes forgetting. Option 1 vs Option 2 analysis in `docs/design/time_reporting_plan.md` § Worker Missed Punch In.
 - Consequences: admin Timesheet has "+ Add entry" and edit flows as the correction mechanism.
 - Spawns: none

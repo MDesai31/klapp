@@ -12,6 +12,7 @@ import (
 	"klapp/internal/config"
 	"klapp/internal/models"
 
+	"github.com/alexedwards/scs/v2"
 	_ "modernc.org/sqlite"
 )
 
@@ -20,6 +21,7 @@ type application struct {
 	workers       *models.WorkerModel
 	timePunches   *models.TimePunchModel
 	templateCache map[string]*template.Template
+	punchSessions *scs.SessionManager
 	pinLimiter    *pinLimiter
 	pinCheckDelay time.Duration
 }
@@ -56,6 +58,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Worker punch sessions hold only the worker ID between PIN entry and
+	// the punch button, so the PIN never round-trips through the client
+	// (docs/reference/security.md). Short-lived by design: a worker
+	// re-enters their PIN on each visit, same as before.
+	punchSessions := newPunchSessionManager()
+
 	app := &application{
 		logger:  logger,
 		workers: &models.WorkerModel{DB: sqlDB},
@@ -64,6 +72,7 @@ func main() {
 			DailyPunchLimit: cfg.DailyPunchLimit,
 		},
 		templateCache: templateCache,
+		punchSessions: punchSessions,
 		pinLimiter: newPinLimiter(
 			cfg.PinLockoutThreshold,
 			time.Duration(cfg.PinLockoutWindowMinutes)*time.Minute,

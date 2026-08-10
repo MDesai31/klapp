@@ -6,15 +6,28 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alexedwards/scs/v2"
 	"klapp/internal/models"
 )
+
+// newPunchSessionManager configures the worker-site session store: it holds
+// only the authenticated worker's ID so punch in/out never resend the PIN.
+func newPunchSessionManager() *scs.SessionManager {
+	sm := scs.New()
+	sm.Lifetime = 30 * time.Minute
+	// Distinct cookie name so it can never collide with the admin
+	// session when both sites are reached via the same host.
+	sm.Cookie.Name = "punch_session"
+	return sm
+}
 
 func (app *application) punchForm(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Spanish: true})
 }
 
-// punchStatus identifies the worker by PIN and shows whether they're
-// currently punched in.
+// punchStatus identifies the worker by PIN, stores their ID in the punch
+// session, and shows whether they're currently punched in. The PIN itself
+// never goes back to the client.
 func (app *application) punchStatus(w http.ResponseWriter, r *http.Request) {
 	pin := r.PostFormValue("pin")
 
@@ -24,8 +37,14 @@ func (app *application) punchStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := app.punchSessions.RenewToken(r.Context()); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	app.punchSessions.Put(r.Context(), "workerID", worker.ID)
+
 	spanish := worker.Language != "english"
-	data := templateData{Worker: &worker, PIN: pin, Spanish: spanish}
+	data := templateData{Worker: &worker, Spanish: spanish}
 
 	open, err := app.timePunches.Open(worker.ID)
 	if err == nil {
@@ -39,10 +58,8 @@ func (app *application) punchStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) punchIn(w http.ResponseWriter, r *http.Request) {
-	pin := r.PostFormValue("pin")
-	worker, err := app.authenticateWorker(r, pin)
-	if err != nil {
-		app.showInvalidPIN(w, r, "punch.tmpl", err)
+	worker, ok := app.sessionWorker(w, r)
+	if !ok {
 		return
 	}
 
@@ -75,14 +92,12 @@ func (app *application) punchIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	spanish := worker.Language != "english"
-	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Worker: &worker, OpenPunch: &open, PIN: pin, Spanish: spanish})
+	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Worker: &worker, OpenPunch: &open, Spanish: spanish})
 }
 
 func (app *application) punchOut(w http.ResponseWriter, r *http.Request) {
-	pin := r.PostFormValue("pin")
-	worker, err := app.authenticateWorker(r, pin)
-	if err != nil {
-		app.showInvalidPIN(w, r, "punch.tmpl", err)
+	worker, ok := app.sessionWorker(w, r)
+	if !ok {
 		return
 	}
 
@@ -156,6 +171,28 @@ func (app *application) punchLate(w http.ResponseWriter, r *http.Request) {
 
 	flash := pickMsg(spanish, "¡Listo, gracias por avisarnos!", "Got it, thanks for letting us know.")
 	app.render(w, r, http.StatusOK, "punch_late.tmpl", templateData{Worker: &worker, Spanish: spanish, Flash: flash})
+}
+
+// sessionWorker resolves the punch session to an active worker. When the
+// session is missing/expired (or the worker was deactivated mid-session) it
+// renders the PIN entry form and reports !ok — the caller just returns.
+func (app *application) sessionWorker(w http.ResponseWriter, r *http.Request) (models.Worker, bool) {
+	id := app.punchSessions.GetInt(r.Context(), "workerID")
+	if id != 0 {
+		worker, err := app.workers.Get(id)
+		if err == nil && worker.Active {
+			return worker, true
+		}
+		if err != nil && !errors.Is(err, models.ErrNoRecord) {
+			app.serverError(w, r, err)
+			return models.Worker{}, false
+		}
+		app.punchSessions.Remove(r.Context(), "workerID")
+	}
+
+	// Worker is unknown here; default to Spanish like showInvalidPIN.
+	app.render(w, r, http.StatusOK, "punch.tmpl", templateData{Spanish: true, Flash: "Tu sesión expiró. Ingresa tu PIN de nuevo."})
+	return models.Worker{}, false
 }
 
 // authenticateWorker looks up the worker for pin, applying a fixed delay to

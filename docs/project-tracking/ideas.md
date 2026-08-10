@@ -31,13 +31,6 @@ Future intents — captured by `/project-plan`, not started. Scope before acting
 - Why/context: from `todo.md` Nice-to-have (verbatim, sentence trails off: "if a worker punched out, outside of Mary"). GPS is an audit signal, not access control — see `docs/reference/security.md`.
 - To start, future-us needs: the locations-of-interest list and radius config; per-worker `require_location` flag already exists.
 
-### optimize-claude-md — Slim CLAUDE.md so sessions need less context
-- Workstream: ops
-- Priority: someday
-- Intended start: someday
-- Why/context: from `todo.md` Nice-to-have. Partially addressed by the workspace-os memory layer (consult-when-relevant facts now live in `docs/memory/`).
-- To start, future-us needs: apply the boundary test line-by-line to `CLAUDE.md`.
-
 ### photo-attachments — Before/after photos per invoice
 - Workstream: invoicing
 - Priority: someday

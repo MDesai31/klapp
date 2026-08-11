@@ -966,3 +966,58 @@ func TestPayPeriodStartEveryDayInOwnPeriod(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminPunchOut(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Manthan", "7777", true)
+
+	start := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
+	id, err := tm.PunchIn(workerID, nil, nil, start)
+	if err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	end := start.Add(7 * time.Hour)
+	if err := tm.AdminPunchOut(workerID, end); err != nil {
+		t.Fatalf("AdminPunchOut: %v", err)
+	}
+
+	p, err := tm.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !p.EndTime.Valid || p.EndTime.String != end.UTC().Format(time.RFC3339) {
+		t.Errorf("end_time = %v, want %s", p.EndTime, end.UTC().Format(time.RFC3339))
+	}
+	if !p.ModifiedByAdmin {
+		t.Error("want modified_by_admin = true")
+	}
+
+	if err := tm.AdminPunchOut(workerID, end); !errors.Is(err, ErrNoRecord) {
+		t.Errorf("got error %v, want ErrNoRecord with nothing open", err)
+	}
+}
+
+func TestAdminPunchOutEndBeforeStart(t *testing.T) {
+	db := newTestDB(t)
+	tm := &TimePunchModel{DB: db}
+	workerID := mustInsertWorker(t, db, "Thomas", "8888", true)
+
+	start := time.Date(2026, 6, 17, 8, 0, 0, 0, time.Local)
+	if _, err := tm.PunchIn(workerID, nil, nil, start); err != nil {
+		t.Fatalf("PunchIn: %v", err)
+	}
+
+	if err := tm.AdminPunchOut(workerID, start.Add(-time.Hour)); !errors.Is(err, ErrEndBeforeStart) {
+		t.Errorf("got error %v, want ErrEndBeforeStart", err)
+	}
+	if err := tm.AdminPunchOut(workerID, start); !errors.Is(err, ErrEndBeforeStart) {
+		t.Errorf("got error %v for an end equal to the start, want ErrEndBeforeStart", err)
+	}
+
+	// The punch is still open after a rejected time.
+	if _, err := tm.Open(workerID); err != nil {
+		t.Errorf("Open after rejected AdminPunchOut: %v", err)
+	}
+}

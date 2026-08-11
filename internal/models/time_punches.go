@@ -358,6 +358,28 @@ func (m *TimePunchModel) PunchOut(workerID int, lat, lon *float64, now time.Time
 	return nil
 }
 
+// AdminPunchOut closes the worker's open punch at a time the admin typed
+// in rather than at "now", and flags the punch as admin-modified.
+//
+// PunchOut can stamp its end time unchecked because the clock only ever
+// moves forward past the punch-in; a hand-entered time can land before it,
+// so the start is checked here. Returns ErrNoRecord if the worker has
+// nothing open, ErrEndBeforeStart if endTime is not after the start.
+func (m *TimePunchModel) AdminPunchOut(workerID int, endTime time.Time) error {
+	open, err := m.Open(workerID)
+	if err != nil {
+		return err
+	}
+
+	if !endTime.After(open.StartTime) {
+		return ErrEndBeforeStart
+	}
+
+	_, err = m.DB.Exec(`UPDATE time_punches SET end_time = ?, modified_by_admin = TRUE WHERE id = ?`,
+		endTime.UTC().Format(time.RFC3339), open.ID)
+	return err
+}
+
 // PunchOutLate records a worker's real end time via the late-notice link.
 // No location is captured - the worker is just entering a finish time after
 // the fact. It closes the worker's open punch if one exists; otherwise it
@@ -740,9 +762,11 @@ func (m *TimePunchModel) AdminCreate(workerID int, startTime, endTime time.Time)
 		end = endTime.UTC().Format(time.RFC3339)
 	}
 
+	// Coords stay NULL: nobody was at a location, and 0,0 would render as
+	// a map link to Null Island on the timesheet.
 	stmt := `INSERT INTO time_punches
 		(worker_id, pay_period, day, start_time, end_time, start_lat, start_lon, modified_by_admin)
-		VALUES (?, ?, ?, ?, ?, 0, 0, TRUE)`
+		VALUES (?, ?, ?, ?, ?, NULL, NULL, TRUE)`
 	result, err := m.DB.Exec(stmt, workerID, payPeriod, day, startTime.UTC().Format(time.RFC3339), end)
 	if isOpenPunchConflict(err) {
 		return 0, ErrAlreadyOpen

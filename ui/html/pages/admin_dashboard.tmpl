@@ -12,7 +12,7 @@
 {{range .DashboardRows}}
 <tr{{if not .StartTime.Valid}} class="not-in"{{end}}>
     <td>
-    <input type="checkbox" class="punch-check" name="worker_id" value="{{.WorkerID}}" data-state="{{if .PunchedIn}}in{{else}}out{{end}}">
+    <input type="checkbox" class="punch-check" name="worker_id" value="{{.WorkerID}}">
     </td>
     <td>{{.WorkerName}}</td>
     <td>{{.StatusLabel}}</td>
@@ -23,8 +23,18 @@
 </tr>
 {{end}}
 </table>
-<p id="punch-mixed" class="flash" hidden>Some selected workers are punched in and some aren't. Select one group or the other.</p>
-<button type="submit" id="punch-selected" name="action" value="in" disabled>Punch Selected</button>
+<div class="punch-times">
+    <div>
+    <label for="time-in">Time in</label>
+    <input type="time" id="time-in" name="time_in">
+    </div>
+    <div>
+    <label for="time-out">Time out</label>
+    <input type="time" id="time-out" name="time_out">
+    </div>
+</div>
+<button type="submit" id="punch-selected" disabled>Punch In / Punch Out</button>
+<p class="hint">Fill in one time, the other, or both: both records a whole shift. Times apply to today, and mark the punch as admin-entered. Leave both blank to punch at the current time.</p>
 </form>
 
 <script>
@@ -32,33 +42,24 @@
     var checks = document.querySelectorAll(".punch-check");
     var selectAll = document.getElementById("punch-select-all");
     var button = document.getElementById("punch-selected");
-    var mixed = document.getElementById("punch-mixed");
+    var timeIn = document.getElementById("time-in");
+    var timeOut = document.getElementById("time-out");
 
-    // The whole selection gets one action, so the button follows the state
-    // of what's selected: punch in workers who are out, punch out workers
-    // who are in, and refuse a selection that mixes the two.
-    function updateButton() {
-        var selectedIn = false;
-        var selectedOut = false;
-        checks.forEach(function (c) {
-            if (!c.checked) return;
-            if (c.dataset.state === "in") selectedIn = true;
-            else selectedOut = true;
+    // Typical days start at 8, so a blank field fills itself in the moment
+    // it's touched; the admin only has to change it when the day was odd,
+    // and an untouched field stays blank and means "don't punch that end".
+    [[timeIn, "08:00"], [timeOut, "17:00"]].forEach(function (pair) {
+        pair[0].addEventListener("focus", function () {
+            if (!pair[0].value) pair[0].value = pair[1];
         });
+    });
 
-        mixed.hidden = !(selectedIn && selectedOut);
-
-        if (selectedIn === selectedOut) {
-            // Nothing selected, or a mix of both.
-            button.disabled = true;
-            button.value = "in";
-            button.textContent = "Punch Selected";
-            return;
-        }
-
-        button.disabled = false;
-        button.value = selectedIn ? "out" : "in";
-        button.textContent = selectedIn ? "Punch Out Selected" : "Punch In Selected";
+    // The times decide what the punch is, so the button only cares that
+    // somebody is selected.
+    function updateButton() {
+        button.disabled = ![].some.call(checks, function (c) {
+            return c.checked;
+        });
     }
 
     checks.forEach(function (c) {

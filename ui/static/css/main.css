@@ -100,6 +100,27 @@ tr.nc-edited {
     background: #e8f4fd;
 }
 
+/* The dashboard's optional punch-in/punch-out times, above the bulk
+   button: either one on its own, or both to record a whole shift. */
+.punch-times {
+    display: flex;
+    gap: 1rem;
+}
+
+.punch-times > div {
+    flex: 1;
+}
+
+.punch-times label {
+    margin-top: 0.5rem;
+    font-weight: normal;
+}
+
+.hint {
+    color: #666;
+    font-size: 0.9rem;
+}
+
 .btn-delete {
     width: auto;
     padding: 0.15rem 0.4rem;

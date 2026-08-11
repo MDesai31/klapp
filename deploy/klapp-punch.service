@@ -1,0 +1,14 @@
+[Unit]
+Description=Klaus Field Log (worker punch site)
+After=network.target
+
+[Service]
+Type=simple
+User=tklaus
+WorkingDirectory=/opt/klapp
+ExecStart=/opt/klapp/punch -addr=127.0.0.1:4000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

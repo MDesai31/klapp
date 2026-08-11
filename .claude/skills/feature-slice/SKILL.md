@@ -23,7 +23,9 @@ template. Use `codebase-map` to locate things without reading whole files.
    `ErrDailyLimitExceeded`, `ErrInvalidPIN`, `ErrInvalidCredentials`) — add a new
    one there rather than returning bare `errors.New` from a model.
 
-3. **Handler** — `cmd/web/handlers_admin*.go` or `handlers_punch.go`:
+3. **Handler** — `cmd/admin/handlers*.go` or `cmd/punch/handlers.go`. Pick the
+   binary first: the two are separate `package main`s and share nothing but
+   `internal/` and `db/`.
    ```go
    func (app *application) adminThing(w http.ResponseWriter, r *http.Request) {
        // r.PathValue("id") for path params, r.PostFormValue / r.PostForm for body
@@ -33,18 +35,22 @@ template. Use `codebase-map` to locate things without reading whole files.
    }
    ```
    Map expected model errors to a user-facing message; only unexpected ones go to
-   `serverError`. `punchTimeErrorFlash` in `handlers_admin_timesheet.go` is the
-   pattern for reusing that mapping across handlers.
+   `serverError`. `punchTimeErrorFlash` in `cmd/admin/handlers_timesheet.go` is
+   the pattern for reusing that mapping across handlers.
 
-4. **Route** — `cmd/web/routes.go`. Admin routes go on the `protected` mux
-   (behind `requireAdmin`); only the login page and static files sit outside it.
-   Worker routes go in `routes()`. Method + path patterns, e.g.
+4. **Route** — `cmd/admin/routes.go` or `cmd/punch/routes.go`. Admin routes go on
+   the `protected` mux (behind `requireAdmin`); only the login page and static
+   files sit outside it. Method + path patterns, e.g.
    `protected.HandleFunc("POST /admin/punch/bulk", app.adminBulkPunch)`.
 
-5. **templateData** — add a field in `cmd/web/templates.go`, in the commented
-   section it belongs to. One struct serves every page; unused fields stay zero.
+5. **templateData** — add a field in that binary's `templates.go`, in the
+   commented section it belongs to. **Each binary has its own struct** — a field
+   added to `cmd/admin/templates.go` does not exist on the punch site. One struct
+   serves every page of that site; unused fields stay zero.
 
-6. **Template** — `ui/html/pages/*.tmpl`, defining `"title"` and `"main"`. Admin
+6. **Template** — `ui/html/pages/*.tmpl`, defining `"title"` and `"main"`. The
+   filename decides which binary parses it: `admin_*.tmpl` → admin, `punch*.tmpl`
+   → punch. A new page named outside those patterns will never load. Admin
    pages start with `{{template "nav" .}}`. Style with the classes already in
    `ui/static/css/main.css`. Any JS goes in an inline `<script>` at the bottom of
    the page — there is no build step and no external JS/CSS.
@@ -52,9 +58,9 @@ template. Use `codebase-map` to locate things without reading whole files.
 7. **Test** — model methods get tests in `internal/models/*_test.go` using
    `newTestDB(t)` (throwaway SQLite file per test, migrations applied fresh, safe
    in parallel) and helpers like `mustInsertWorker`. Handlers have no HTTP test
-   harness; verify them with the `smoke-test` skill. `cmd/web/templates_test.go`
-   guards templates against nil-field panics — extend its case table when a page
-   gains a field that can be nil.
+   harness; verify them with the `smoke-test` skill. `cmd/punch/templates_test.go`
+   guards the punch templates against nil-field panics — extend its case table
+   when a page gains a field that can be nil.
 
 Then: `go build ./... && go vet ./... && go test ./...`
 

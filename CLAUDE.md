@@ -1,23 +1,32 @@
+@docs/memory/MEMORY.md
+
 ## Project
-Klaus Field Log — Go + SQLite. Two binaries: the public worker punch site and the
-LAN/WireGuard-only admin site. See `refactor.md` and `time_reporting_plan.md` for
+Klaus Field Log — Go + SQLite. Three binaries, one database: the public worker
+punch site (`cmd/punch`), the LAN/WireGuard-only admin site (`cmd/admin`), and the
+invoice site (`cmd/invoice`). See `refactor.md` and `time_reporting_plan.md` for
 the design.
 
 ## Running
-- Worker site: `go run ./cmd/web` (default `:4000`)
-- Admin site: started by the same binary on a second port (default `:8082`,
-  flag `-admin-addr`), bound to all interfaces so it's reachable over LAN and WireGuard
+- Worker punch site: `go run ./cmd/punch` (default `:4000`)
+- Admin site: `go run ./cmd/admin` (default `:8082`), bound to all interfaces so
+  it's reachable over LAN and WireGuard
+- The two are independent processes — the admin site runs fine with the punch site
+  switched off, which is the default deploy (see `deploy/update.sh`). The nightly
+  9 PM punch-out sweep therefore lives in `cmd/admin`, the always-on binary.
 - Bootstrap the first admin login: `go run ./cmd/seedadmin -username <name> -password <pw>`
 - DB migrations (goose, embedded) run automatically on startup against `db/klapp.db`
-  (gitignored, created on first run)
+  (gitignored, created on first run) — every binary applies them, goose is idempotent
 - Tunable settings (PIN lockout threshold/window/cooldown, per-attempt delay, daily
-  punch-in cap) live in a JSON config file, flag `-config` (default `config.json`,
-  gitignored; see `config.example.json`). Missing file falls back to built-in
-  defaults — see `cmd/web/config.go`.
+  punch-in cap, punch site URL) live in a JSON config file read by both sites, flag
+  `-config` (default `config.json`, gitignored; see `config.example.json`). Missing
+  file falls back to built-in defaults — see `internal/config/config.go`.
 
 ## Conventions
-- Project layout follows `~/go-utils/snippetbox` (app struct in `cmd/web/main.go`,
-  models in `internal/models/`, html/template pages in `ui/html/pages/`)
+- Project layout follows `~/go-utils/snippetbox` (app struct in each binary's
+  `main.go`, models in `internal/models/`, html/template pages in `ui/html/pages/`)
+- Each binary is its own `package main` with its own `templateData`, template cache,
+  and `render`/`serverError` helpers. Only `internal/` and `db/` are shared. The
+  template cache globs just that site's pages (`punch*.tmpl` vs `admin_*.tmpl`).
 - Dates/times are stored as ISO-8601 `TEXT` in SQLite (UTC instants, local-date
   day/pay-period buckets) — see `internal/models/time_punches.go`
 - No ORM — raw SQL via `database/sql`
@@ -34,18 +43,19 @@ change spanning model/handler/route/template), `smoke-test` (scripted local run
 + curl helpers), `deploy-ops` (systemd, /opt/klapp, update.sh).
 
 ## Manual/local testing
-- `klapp.service` (systemd) already runs the real binary on default ports `:4000`/`:8082`
-  against `/opt/klapp`'s db — never reuse those ports or that db for ad-hoc testing.
-  `.claude/skills/smoke-test/scripts/scratch-up.sh` starts a seeded throwaway
-  instance on `:14000`/`:18082` instead; `scratch-down.sh` stops it.
+- `klapp-admin.service` and `klapp-punch.service` (systemd) run the real binaries on
+  default ports `:8082`/`:4000` against `/opt/klapp`'s db — never reuse those ports
+  or that db for ad-hoc testing. `.claude/skills/smoke-test/scripts/scratch-up.sh`
+  starts both, seeded, on `:18082`/`:14000` instead; `scratch-down.sh` stops them.
 - `workers.phone` is nullable in the schema; the Go model scans it through
   `COALESCE(phone, '')`, so hand-inserted rows with `NULL` phone are safe, but prefer
   `phone = ''` for consistency with what the app writes.
 
 ## Key files
-- Worker site handlers: `cmd/web/handlers_punch.go`. Admin site handlers:
-  `cmd/web/handlers_admin.go`. Routes: `cmd/web/routes.go`. Template data struct:
-  `cmd/web/templates.go`.
+- Worker site: `cmd/punch/handlers.go`, `cmd/punch/routes.go`, `cmd/punch/templates.go`.
+- Admin site: `cmd/admin/handlers*.go`, `cmd/admin/routes.go`, `cmd/admin/templates.go`.
+- Deploy: `deploy/lib.sh` holds the build/unit/service logic shared by
+  `deploy/deploy.sh` (first-time setup) and `deploy/update.sh` (routine push).
 - There is exactly one "dashboard": `/admin` (`admin_dashboard.tmpl`), backed by
   `models.DashboardStatus`/`DashboardRow` in `internal/models/time_punches.go`.
   The worker-facing page is `punch.tmpl` ("Punch"), not a dashboard.

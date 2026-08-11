@@ -5,9 +5,10 @@ description: Run klapp locally against a throwaway SQLite database on scratch po
 
 # Smoke-testing klapp locally
 
-`klapp.service` runs the real app on `:4000` / `:8082` against
-`/opt/klapp/db/klapp.db`. **Never reuse those ports or that database.** The
-scripts here use `:14000` / `:18082` and a throwaway DB in `/tmp/klapp-scratch`.
+`klapp-admin.service` and `klapp-punch.service` run the real apps on `:8082` /
+`:4000` against `/opt/klapp/db/klapp.db`. **Never reuse those ports or that
+database.** The scripts here use `:18082` / `:14000` and a throwaway DB in
+`/tmp/klapp-scratch`.
 
 ## Start
 
@@ -15,11 +16,16 @@ scripts here use `:14000` / `:18082` and a throwaway DB in `/tmp/klapp-scratch`.
 .claude/skills/smoke-test/scripts/scratch-up.sh
 ```
 
-Builds `cmd/web`, creates a fresh DB with migrations, seeds admin `admin` /
-`scratchpw123` and three active workers (Ana PIN 1111 / Spanish, Bob 2222 /
-English, Cid 3333 / English, all punched out), starts the server, waits for it
-to answer, and prints the URLs and PID. Add `--keep-db` to restart the server
-without wiping data.
+Builds `cmd/admin` and `cmd/punch`, creates a fresh DB with migrations, seeds
+admin `admin` / `scratchpw123` and three active workers (Ana PIN 1111 / Spanish,
+Bob 2222 / English, Cid 3333 / English, all punched out), starts **both**
+servers against the same DB, waits for them to answer, and prints the URLs and
+PIDs. Add `--keep-db` to restart them without wiping data.
+
+They are separate processes with separate logs (`/tmp/klapp-scratch/admin.log`,
+`punch.log`). If only one site matters for what you're testing, you can still
+start just it by hand — but the script's shared DB is what makes a punch-then-
+check-the-dashboard test work.
 
 ## Drive the admin site
 
@@ -79,14 +85,15 @@ Times are stored UTC RFC3339; `day` and `pay_period` are local dates.
 
 ## Gotchas these scripts already handle
 
-- **Working directory** — the binary globs `./ui/html/pages/*.tmpl` and serves
-  `./ui/static/` relative to its CWD, so it must run from the repo root.
+- **Working directory** — each binary globs its own pages out of
+  `./ui/html/pages/` (`admin_*.tmpl` for admin, `punch*.tmpl` for punch) and
+  serves `./ui/static/` relative to its CWD, so both must run from the repo root.
 - **`GET /admin` 301s to `/admin/`** — without `-L` you get an empty body and
   may misread it as a lost session.
 - **Mutations answer 303** — `-L` follows through to the rendered page so you
   can see the flash message.
-- **`go run`'s child outlives `kill %1`** — the scripts build a real binary and
-  track its PID instead.
+- **`go run`'s child outlives `kill %1`** — the scripts build real binaries and
+  track their PIDs instead (`admin.pid`, `punch.pid`).
 - **`pkill -f 18082` kills your own shell** — the pattern matches any command
   line mentioning the port, including the one running `pkill`. `scratch-down.sh`
   uses the pidfile, falling back to whatever `ss` shows actually listening.

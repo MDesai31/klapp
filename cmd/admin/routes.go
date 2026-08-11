@@ -2,26 +2,9 @@ package main
 
 import "net/http"
 
-func (app *application) routes() http.Handler {
-	mux := http.NewServeMux()
-
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
-
-	mux.HandleFunc("GET /{$}", app.punchForm)
-	mux.HandleFunc("GET /punch", app.punchForm)
-	mux.HandleFunc("POST /punch", app.punchStatus)
-	mux.HandleFunc("POST /punch/in", app.punchIn)
-	mux.HandleFunc("POST /punch/out", app.punchOut)
-	mux.HandleFunc("GET /punch/late", app.punchLateForm)
-	mux.HandleFunc("POST /punch/late", app.punchLate)
-
-	return mux
-}
-
-// adminRoutes serves the LAN/WireGuard-only admin site. Everything under
+// routes serves the LAN/WireGuard-only admin site. Everything under
 // /admin/ except the login page itself requires a logged-in admin session.
-func (app *application) adminRoutes() http.Handler {
+func (app *application) routes() http.Handler {
 	mux := http.NewServeMux()
 
 	fileServer := http.FileServer(http.Dir("./ui/static/"))

@@ -1,4 +1,7 @@
-package main
+// Package config holds the tunable settings shared by the punch and admin
+// binaries. Both read the same JSON file (config.json in the working
+// directory by default) and ignore the fields that don't apply to them.
+package config
 
 import (
 	"encoding/json"
@@ -7,11 +10,11 @@ import (
 	"os"
 )
 
-// Config holds tunable settings for the worker punch site that operators
-// may want to adjust without recompiling - currently just the PIN-guessing
-// throttle and the daily punch-in cap. Loaded from a JSON file (see
-// config.example.json); any field left out of the file, or the file being
-// absent entirely, falls back to the default below.
+// Config holds tunable settings that operators may want to adjust without
+// recompiling - the PIN-guessing throttle and daily punch-in cap for the
+// punch site, the punch site's public URL for the admin site. Loaded from a
+// JSON file (see config.example.json); any field left out of the file, or
+// the file being absent entirely, falls back to the default below.
 type Config struct {
 	// PinLockoutThreshold is how many failed PIN attempts from one IP
 	// within PinLockoutWindowMinutes trigger a lockout.
@@ -32,7 +35,8 @@ type Config struct {
 	PunchSiteURL string `json:"punch_site_url"`
 }
 
-func defaultConfig() Config {
+// Default returns the built-in settings used when no config file exists.
+func Default() Config {
 	return Config{
 		PinLockoutThreshold:       10,
 		PinLockoutWindowMinutes:   15,
@@ -43,12 +47,12 @@ func defaultConfig() Config {
 	}
 }
 
-// loadConfig reads path as JSON into a Config seeded with defaults. A
-// missing file is not an error - the defaults are used as-is, so the app
-// runs with no config file present. A malformed file is an error, since
-// that indicates operator mistake rather than absence.
-func loadConfig(path string) (Config, error) {
-	cfg := defaultConfig()
+// Load reads path as JSON into a Config seeded with defaults. A missing
+// file is not an error - the defaults are used as-is, so the app runs with
+// no config file present. A malformed file is an error, since that
+// indicates operator mistake rather than absence.
+func Load(path string) (Config, error) {
+	cfg := Default()
 
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {

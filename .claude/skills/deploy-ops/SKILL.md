@@ -13,30 +13,41 @@ runs from `/opt/klapp`. **Confirm with the user before restarting or deploying**
 
 | Unit | Binary | Listens | Exposure |
 |---|---|---|---|
-| `klapp` | `/opt/klapp/web` | `127.0.0.1:4000` worker site, `:8082` admin site | worker site via Caddy TLS; admin on all interfaces for LAN/WireGuard only |
-| `klapp-invoice` | `/opt/klapp/invoice` | `:8083` | invoice site |
+| `klapp-admin` | `/opt/klapp/admin` | `:8082` | all interfaces, LAN/WireGuard only |
+| `klapp-punch` | `/opt/klapp/punch` | `127.0.0.1:4000` | public via Caddy TLS — **disabled by default** |
+| `klapp-invoice` | `/opt/klapp/invoice` | `:8083` | invoice site, LAN/WireGuard only |
 | `caddy` | — | `:443` | `work.klauslandscaping.com` → `localhost:4000` |
 
 The admin port is deliberately bound to all interfaces and deliberately not
 behind Caddy — it is reachable only over LAN/WireGuard, and that trust boundary
 is what justifies the admin site having no CSRF protection.
 
-`/opt/klapp` holds `web`, `invoice`, `ui/` (rsynced from the repo) and
-`db/klapp.db` — the live database. Never point a dev or test command at it.
+`/opt/klapp` holds `admin`, `punch`, `invoice`, `ui/` (rsynced from the repo)
+and `db/klapp.db` — the live database. Never point a dev or test command at it.
+
+The pre-split `klapp` unit and its `/opt/klapp/web` binary are gone; the deploy
+scripts remove them on the first run after the split.
 
 ## Push a code change
 
 From the repo root, after committing:
 
 ```bash
-./deploy/update.sh
+./deploy/update.sh                # admin + invoice up, punch site OFF
+./deploy/update.sh --with-punch   # ...and punch site ON
 ```
 
-Builds both binaries into `/opt/klapp`, rsyncs `ui/`, restarts `klapp` and
-`klapp-invoice`. Needs sudo for the restarts. That's the whole deploy.
+Builds all three binaries into `/opt/klapp`, rsyncs `ui/`, refreshes the systemd
+units from the repo, restarts `klapp-admin` and `klapp-invoice`, and then
+`enable --now` / `disable --now`s `klapp-punch` per the flag. Needs sudo.
 
-`deploy/deploy.sh` is **first-time setup only** — it installs the systemd units,
-enables them, and installs/configures Caddy. Don't re-run it for a routine push.
+**The flag is re-applied on every deploy.** Running plain `./deploy/update.sh`
+while the punch site is up will take it down — workers get a Caddy 502. Ask the
+user which they want before deploying.
+
+`deploy/deploy.sh` is **first-time setup only** — it also creates `/opt/klapp`
+and installs/configures Caddy. Don't re-run it for a routine push. Both scripts
+share `deploy/lib.sh`.
 
 ## Things that surprise people
 
@@ -46,18 +57,21 @@ enables them, and installs/configures Caddy. Don't re-run it for a routine push.
   migration file has a `-- +goose Down` section but nothing ever runs it, so
   rolling code back does **not** roll the schema back. A rollback across a
   migration needs a plan for the data.
-- **`config.json` lives in `/opt/klapp`, not the repo** (it's gitignored). If
-  it's missing the app runs on built-in defaults — see `cmd/web/config.go`.
-- **The 9 PM sweep** auto-closes open punches and flags them non-compliant. A
-  restart between 9 PM and midnight re-runs a catch-up sweep on startup, by
-  design (`runNightlyPunchOut` in `cmd/web/main.go`).
+- **`config.json` lives in `/opt/klapp`, not the repo** (it's gitignored). Both
+  the admin and punch binaries read it. If it's missing they run on built-in
+  defaults — see `internal/config/config.go`.
+- **The 9 PM sweep runs in the admin binary**, not the punch one, precisely
+  because the punch site can be switched off. It auto-closes open punches and
+  flags them non-compliant; a restart between 9 PM and midnight re-runs a
+  catch-up sweep on startup, by design (`runNightlyPunchOut` in
+  `cmd/admin/sweep.go`).
 
 ## Status and logs
 
 ```bash
-systemctl status klapp
-journalctl -u klapp -f              # also: -u klapp-invoice, -u caddy
-journalctl -u klapp --since "1 hour ago"
+systemctl status klapp-admin
+journalctl -u klapp-admin -f        # also: -u klapp-punch, -u klapp-invoice, -u caddy
+journalctl -u klapp-admin --since "1 hour ago"
 ```
 
 The app logs structured slog lines to stdout, so journald has everything.

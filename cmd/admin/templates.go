@@ -7,29 +7,25 @@ import (
 	"klapp/internal/models"
 )
 
-// templateData holds everything a page template might need. Fields are
+// templateData holds everything an admin page might need. Fields are
 // nil/empty unless that particular page sets them.
 type templateData struct {
-	// worker site
-	Worker    *models.Worker
-	OpenPunch *models.TimePunch
-	PIN       string // echoed into a hidden field so punch in/out can resend it
-	Spanish   bool   // true when the worker's language is spanish (or unknown)
+	Admin *models.Admin
 
-	// admin site — timekeeping
-	Admin               *models.Admin
+	// timekeeping
 	DashboardRows       []models.DashboardRow
 	TimesheetRows       []models.TimesheetRow
 	SummaryRows         []models.PayPeriodSummaryRow
 	SummaryDays         []string
 	PayPeriods          []string
 	CurrentPeriod       string
+	Worker              *models.Worker
 	Workers             []models.Worker
 	ShowInactiveWorkers bool
 	Punch               *models.TimePunch
 	NotifyBaseURL       string
 
-	// admin site — invoices
+	// invoices
 	Invoices    []models.Invoice
 	Invoice     *models.Invoice
 	CurrentPage int
@@ -37,12 +33,12 @@ type templateData struct {
 	PrevPage    int
 	NextPage    int
 
-	// admin site — customers
+	// customers
 	Customers   []models.Customer
 	Customer    *models.Customer
 	SearchQuery string
 
-	// admin site — catalog
+	// catalog
 	JobDescriptions []models.JobDescription
 	Materials       []models.Material
 
@@ -58,10 +54,12 @@ var templateFuncs = template.FuncMap{
 	"safeURL": func(s string) template.URL { return template.URL(s) },
 }
 
+// newTemplateCache parses only the admin pages. The worker-facing punch
+// pages live in the same directory but belong to the punch binary.
 func newTemplateCache() (map[string]*template.Template, error) {
 	cache := map[string]*template.Template{}
 
-	pages, err := filepath.Glob("./ui/html/pages/*.tmpl")
+	pages, err := filepath.Glob("./ui/html/pages/admin_*.tmpl")
 	if err != nil {
 		return nil, err
 	}

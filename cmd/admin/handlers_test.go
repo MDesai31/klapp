@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestParseTimeToday(t *testing.T) {
+func TestParseTimeOnDay(t *testing.T) {
 	day := time.Date(2026, 6, 17, 15, 30, 0, 0, time.Local)
 
 	tests := []struct {
@@ -23,18 +23,18 @@ func TestParseTimeToday(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseTimeToday(tt.value, day)
+			got, err := parseTimeOnDay(tt.value, day)
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("parseTimeToday(%q) = %v, want an error", tt.value, got)
+					t.Fatalf("parseTimeOnDay(%q) = %v, want an error", tt.value, got)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("parseTimeToday(%q): %v", tt.value, err)
+				t.Fatalf("parseTimeOnDay(%q): %v", tt.value, err)
 			}
 			if !got.Equal(tt.want) {
-				t.Errorf("parseTimeToday(%q) = %v, want %v", tt.value, got, tt.want)
+				t.Errorf("parseTimeOnDay(%q) = %v, want %v", tt.value, got, tt.want)
 			}
 		})
 	}
@@ -46,6 +46,7 @@ func TestBulkPunchFlash(t *testing.T) {
 	tests := []struct {
 		name       string
 		in, out    time.Time
+		dayLabel   string
 		punchedIn  []string
 		punchedOut []string
 		skipped    []string
@@ -100,11 +101,31 @@ func TestBulkPunchFlash(t *testing.T) {
 			skipped: []string{"Ana (that time is before their punch-in)"},
 			want:    "Skipped Ana (that time is before their punch-in).",
 		},
+		{
+			name:      "whole shift on a named day",
+			in:        at.Add(time.Hour),
+			out:       at.Add(10 * time.Hour),
+			dayLabel:  "Tue 6/9",
+			punchedIn: []string{"Ana"},
+			want:      "Punched Ana in at 8:00 AM and out at 5:00 PM on Tue 6/9.",
+		},
+		{
+			name:       "punched out on a named day",
+			out:        at.Add(9 * time.Hour),
+			dayLabel:   "Tue 6/9",
+			punchedOut: []string{"Ana"},
+			skipped:    []string{"Beto (not punched in)"},
+			want:       "Punched out Ana at 4:00 PM on Tue 6/9. Skipped Beto (not punched in).",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := bulkPunchFlash(tt.in, tt.out, tt.punchedIn, tt.punchedOut, tt.skipped)
+			got := bulkPunchFlash(tt.in, tt.out, tt.dayLabel, bulkPunchResult{
+				punchedIn:  tt.punchedIn,
+				punchedOut: tt.punchedOut,
+				skipped:    tt.skipped,
+			})
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}

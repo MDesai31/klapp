@@ -16,7 +16,7 @@ type templateData struct {
 	DashboardRows       []models.DashboardRow
 	TimesheetRows       []models.TimesheetRow
 	SummaryRows         []models.PayPeriodSummaryRow
-	SummaryDays         []string
+	SummaryDays         []summaryDay
 	PayPeriods          []string
 	CurrentPeriod       string
 	Worker              *models.Worker
@@ -43,6 +43,14 @@ type templateData struct {
 	Materials       []models.Material
 
 	Flash string
+}
+
+// summaryDay is one day column of the pay period summary: Date is the
+// "2006-01-02" value the bulk punch form posts, Label the short header the
+// table shows.
+type summaryDay struct {
+	Date  string
+	Label string
 }
 
 // templateFuncs are helpers exposed to html/template pages.

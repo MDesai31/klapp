@@ -380,6 +380,40 @@ func (m *TimePunchModel) AdminPunchOut(workerID int, endTime time.Time) error {
 	return err
 }
 
+// AdminPunchOutDay is the day-scoped twin of AdminPunchOut, for the
+// summary tab's bulk punch: it closes the punch the worker has open on day
+// ("2006-01-02") rather than whichever punch they have open right now.
+// The two are the same thing when day is today, but on the summary the
+// admin is usually filling in a day that has already passed, and closing
+// today's punch instead would be plainly wrong. Returns ErrNoRecord if the
+// worker has nothing open on that day, ErrEndBeforeStart if endTime is not
+// after the punch's start.
+func (m *TimePunchModel) AdminPunchOutDay(workerID int, day string, endTime time.Time) error {
+	var id int
+	var start string
+	err := m.DB.QueryRow(`
+		SELECT id, start_time FROM time_punches
+		WHERE worker_id = ? AND day = ? AND end_time IS NULL`, workerID, day).Scan(&id, &start)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNoRecord
+	}
+	if err != nil {
+		return err
+	}
+
+	startTime, err := time.Parse(time.RFC3339, start)
+	if err != nil {
+		return err
+	}
+	if !endTime.After(startTime) {
+		return ErrEndBeforeStart
+	}
+
+	_, err = m.DB.Exec(`UPDATE time_punches SET end_time = ?, modified_by_admin = TRUE WHERE id = ?`,
+		endTime.UTC().Format(time.RFC3339), id)
+	return err
+}
+
 // PunchOutLate records a worker's real end time via the late-notice link.
 // No location is captured - the worker is just entering a finish time after
 // the fact. It closes the worker's open punch if one exists; otherwise it

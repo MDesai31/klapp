@@ -43,6 +43,9 @@ PDFs with reportlab. See `docs/printPlan.md` and `schedule_listener/README.md`.
 - `go test ./...` — model tests use a throwaway SQLite file per test (`t.TempDir()`),
   migrations applied fresh each run. No shared test DB, no race conditions, tests
   can run in parallel.
+- `~/venv/bin/python3 -m unittest discover -s schedule_listener` (from the repo
+  root) — `build_schedule.py`'s tests. Use `~/venv` for anything python here;
+  reportlab is installed there, not in the system interpreter.
 
 ## Skills
 `.claude/skills/` holds task guides Claude loads on demand: `codebase-map`

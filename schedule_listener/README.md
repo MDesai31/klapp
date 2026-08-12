@@ -28,11 +28,14 @@ reads the same fields by name.
 
 ```sh
 # One blank sheet to fill in with a pen
-./build_schedule.py "Juan Perez" 06082026
+~/venv/bin/python3 build_schedule.py "Juan Perez" 06082026
 
 # Filled-in sheets from a captured payload
-./build_schedule.py --json payload.json --outdir out/
+~/venv/bin/python3 build_schedule.py --json payload.json --outdir out/
 ```
+
+reportlab lives in `~/venv` on the home server, not in the system python, which
+is why `python` in the config is that interpreter's full path.
 
 Every row can carry values: the fourteen day rows, the `TOTAL` row, and the
 spare rows under it. A day with more than one punch puts its first punch on
@@ -44,10 +47,31 @@ printed sheet shouldn't claim hours for a shift that hasn't ended.
 It writes one PDF per worker and prints each path on stdout, which is how the
 server learns what was produced.
 
+### Tests
+
+```sh
+~/venv/bin/python3 -m unittest discover -s schedule_listener   # from the repo root
+```
+
+`test_build_schedule.py` checks the cell layout through `sheet_rows()` and then
+builds real PDFs and reads them back with `pdftotext` (those cases skip if
+poppler is missing). `go test ./internal/schedule/...` covers the other half —
+turning punches into the payload these tests take as their input.
+
 ## Deploying
 
 The server is part of the klapp Go module (it imports `internal/schedule`), so
-build it from the repo root and copy the result over:
+it is built from the repo root either way.
+
+The repo lives on the home server itself, so the usual install is local —
+`install.sh` does the whole thing (it asks for sudo twice, for `/opt` and for
+the unit):
+
+```sh
+schedule_listener/install.sh
+```
+
+From a different machine, build and copy instead:
 
 ```sh
 GOOS=linux GOARCH=amd64 go build -o /tmp/schedule-listener ./schedule_listener
@@ -61,10 +85,10 @@ ssh 10.9.0.7 'sudo mv /tmp/schedule-listener.service /etc/systemd/system/ &&
               sudo systemctl enable --now schedule-listener'
 ```
 
-reportlab has to be present on the home server:
+reportlab has to be present in the venv the config points at:
 
 ```sh
-ssh 10.9.0.7 'pip3 install --user reportlab'
+~/venv/bin/pip install reportlab
 ```
 
 `addr` in the example config is `10.9.0.7:5555` — the WireGuard address
@@ -87,13 +111,28 @@ cd /opt/klapp && ./printsched -period 2026-06-08
 
 ## Printing
 
-Not wired up yet. `print_command` in the config is the seam: set it to an argv
-array and the listener runs it once per generated PDF with the file's path
-appended.
+`print_command` is an argv the listener runs once per generated PDF with the
+file's path appended. On the home server that is CUPS:
 
 ```json
-"print_command": ["lp", "-d", "office-laser"]
+"print_command": ["lp", "-d", "HP_OfficeJet_9120e"]
 ```
+
+`HP_OfficeJet_9120e` is the queue that talks to the printer directly
+(`ipp://HP6C0B5ED86EF6.local:631/ipp/print`); `lpstat -p` lists the rest, which
+are the driverless duplicates CUPS discovered for the same machine. An empty
+array turns printing off and the job stops at "PDF on disk".
 
 A failure there is logged and reported back to the admin as a warning — the
 PDFs still exist and can be printed by hand.
+
+To exercise the whole chain without spending paper, hold the jobs in the queue:
+
+```json
+"print_command": ["lp", "-d", "HP_OfficeJet_9120e", "-H", "hold"]
+```
+
+```sh
+lpstat -o                  # the held jobs
+cancel HP_OfficeJet_9120e-81
+```

@@ -25,8 +25,7 @@ import sys
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Table, TableStyle, Paragraph
-from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Table, TableStyle
 from datetime import date, datetime, timedelta
 
 # ── Configuration ────────────────────────────────────────────────────────────
@@ -73,6 +72,36 @@ def row_cells(row, fallback_date=None):
     return [label, row.get("in", ""), row.get("out", ""), row.get("hours", ""), ""]
 
 
+def sheet_rows(name, start_date, days=None, extra=None, total=""):
+    """Lay out one sheet's cells: the table's rows, top to bottom.
+
+    Returns (table_data, n_data_rows, n_blank_rows). Split out from
+    build_schedule so the layout can be checked without drawing a PDF —
+    what lands in which cell is the part worth testing.
+    """
+    days = days or []
+    extra = extra or []
+
+    dates = [start_date + timedelta(days=i) for i in range(WEEKS * 7)]
+    # The spare rows are where a day's second punch goes, so the table has
+    # to grow when someone punched in and out more than once in a day.
+    n_blank_rows = max(MIN_BLANK_ROWS, len(extra))
+
+    table_data = [
+        [name, "", "", "", ""],
+        ["DATE", "ENTRADA", "SALIDA", "HORAS", ""],
+    ]
+    for i, d in enumerate(dates):
+        row = days[i] if i < len(days) else None
+        table_data.append(row_cells(row, fallback_date=d))
+    table_data.append(["TOTAL:", "", "", total, ""])
+    for i in range(n_blank_rows):
+        row = extra[i] if i < len(extra) else None
+        table_data.append(row_cells(row))
+
+    return table_data, len(dates), n_blank_rows
+
+
 def build_schedule(name, start_date, days=None, extra=None, total="", outdir="."):
     """Write one worker's sheet and return the path it was written to.
 
@@ -80,8 +109,7 @@ def build_schedule(name, start_date, days=None, extra=None, total="", outdir="."
     extra is the overflow printed under TOTAL; total is the TOTAL cell.
     All three default to empty, which produces the blank sheet.
     """
-    days = days or []
-    extra = extra or []
+    table_data, n_data_rows, n_blank_rows = sheet_rows(name, start_date, days, extra, total)
 
     output_file = os.path.join(outdir, f"{slug(name)}_{start_date.strftime('%m%d%Y')}_schedule.pdf")
     margin = 0.28 * inch
@@ -94,30 +122,6 @@ def build_schedule(name, start_date, days=None, extra=None, total="", outdir="."
 
     usable_w = letter[0] - 2 * margin
     usable_h = letter[1] - 2 * margin
-
-    name_style = ParagraphStyle(
-        "Name",
-        fontName="Helvetica-Bold",
-        fontSize=16,
-        textColor=BLACK,
-        leading=19,
-    )
-    sub_style = ParagraphStyle(
-        "Sub",
-        fontName="Helvetica",
-        fontSize=9,
-        textColor=BLACK,
-        leading=12,
-    )
-
-    dates = [start_date + timedelta(days=i) for i in range(WEEKS * 7)]
-    end_date = dates[-1]
-    header_text = f"{start_date.strftime('%B %-d')} – {end_date.strftime('%B %-d, %Y')}"
-
-    n_data_rows = len(dates)
-    # The spare rows are where a day's second punch goes, so the table has
-    # to grow when someone punched in and out more than once in a day.
-    n_blank_rows = max(MIN_BLANK_ROWS, len(extra))
 
     # Put everything in one table so heights are exact — no inter-flowable gaps
     # Rows: name, date-range, column headers, 14 days, TOTAL
@@ -140,18 +144,6 @@ def build_schedule(name, start_date, days=None, extra=None, total="", outdir="."
     R_TOTAL       = R_LAST + 1
     R_BLANK_FIRST = R_TOTAL + 1
     R_BLANK_LAST  = R_BLANK_FIRST + n_blank_rows - 1
-
-    table_data = [
-        [name, "", "", "", ""],
-        ["DATE", "ENTRADA", "SALIDA", "HORAS", ""],
-    ]
-    for i, d in enumerate(dates):
-        row = days[i] if i < len(days) else None
-        table_data.append(row_cells(row, fallback_date=d))
-    table_data.append(["TOTAL:", "", "", total, ""])
-    for i in range(n_blank_rows):
-        row = extra[i] if i < len(extra) else None
-        table_data.append(row_cells(row))
 
     row_heights = (
         [name_row_h, col_hdr_row_h]

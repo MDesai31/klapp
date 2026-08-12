@@ -72,8 +72,17 @@ requests are deliberately slow. Ten bad PINs from one IP triggers a lockout.
 
 The summary tab's Print button execs `printsched`, which POSTs to the schedule
 listener on the home server, which runs `build_schedule.py`. All three links can
-be exercised here — **this box has no reportlab and no pip**, so a stub stands in
-for it and dumps the table it would have drawn.
+be exercised here.
+
+**This box is the home server** (`10.9.0.7` on `wg1`), so the real thing is
+available: reportlab lives in `~/venv` and `lp` talks to the printer. Point the
+listener's `python` at `/home/tklaus/venv/bin/python3` and you get actual PDFs,
+readable with `pdftotext -layout` or `pdftoppm -png`. Keep `print_command` empty
+while testing, or hold the jobs (`["lp", "-d", "HP_OfficeJet_9120e", "-H",
+"hold"]`) and `cancel` them afterwards, so a smoke test never spends paper.
+
+The `reportlab-stub` below is the fallback for a box without reportlab — it
+dumps the table `build_schedule.py` would have drawn instead of rendering it.
 
 ```bash
 STUB=.claude/skills/smoke-test/scripts/reportlab-stub

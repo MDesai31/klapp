@@ -4,5 +4,8 @@
   "pin_lockout_cooldown_minutes": 15,
   "pin_check_delay_ms": 250,
   "daily_punch_limit": 3,
-  "punch_site_url": "https://work.klauslandscaping.com"
+  "punch_site_url": "https://work.klauslandscaping.com",
+  "print_host": "10.9.0.7",
+  "print_port": 5555,
+  "print_binary": "./printsched"
 }

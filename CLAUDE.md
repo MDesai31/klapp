@@ -6,6 +6,11 @@ punch site (`cmd/punch`), the LAN/WireGuard-only admin site (`cmd/admin`), and t
 invoice site (`cmd/invoice`). See `refactor.md` and `time_reporting_plan.md` for
 the design.
 
+Two more programs sit off to the side of those three: `cmd/printsched` turns a
+pay period into a print job and posts it to `schedule_listener/`, a small server
+that runs on the home server (`10.9.0.7`, over WireGuard) and builds the printable
+PDFs with reportlab. See `docs/printPlan.md` and `schedule_listener/README.md`.
+
 ## Running
 - Worker punch site: `go run ./cmd/punch` (default `:4000`)
 - Admin site: `go run ./cmd/admin` (default `:8082`), bound to all interfaces so
@@ -14,10 +19,13 @@ the design.
   switched off, which is the default deploy (see `deploy/update.sh`). The nightly
   9 PM punch-out sweep therefore lives in `cmd/admin`, the always-on binary.
 - Bootstrap the first admin login: `go run ./cmd/seedadmin -username <name> -password <pw>`
+- Print a pay period by hand: `go run ./cmd/printsched -period 2026-06-08` (the
+  admin summary tab's Print button shells out to this same binary)
 - DB migrations (goose, embedded) run automatically on startup against `db/klapp.db`
   (gitignored, created on first run) — every binary applies them, goose is idempotent
 - Tunable settings (PIN lockout threshold/window/cooldown, per-attempt delay, daily
-  punch-in cap, punch site URL) live in a JSON config file read by both sites, flag
+  punch-in cap, punch site URL, schedule listener host/port) live in a JSON config
+  file read by both sites, flag
   `-config` (default `config.json`, gitignored; see `config.example.json`). Missing
   file falls back to built-in defaults — see `internal/config/config.go`.
 
@@ -56,6 +64,9 @@ change spanning model/handler/route/template), `smoke-test` (scripted local run
 - Admin site: `cmd/admin/handlers*.go`, `cmd/admin/routes.go`, `cmd/admin/templates.go`.
 - Deploy: `deploy/lib.sh` holds the build/unit/service logic shared by
   `deploy/deploy.sh` (first-time setup) and `deploy/update.sh` (routine push).
+- Printing: `internal/schedule` holds the JSON payload both ends of the print wire
+  import, so its shape can't drift; `schedule_listener/build_schedule.py` reads the
+  same field names.
 - There is exactly one "dashboard": `/admin` (`admin_dashboard.tmpl`), backed by
   `models.DashboardStatus`/`DashboardRow` in `internal/models/time_punches.go`.
   The worker-facing page is `punch.tmpl` ("Punch"), not a dashboard.

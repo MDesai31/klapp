@@ -27,6 +27,14 @@ type application struct {
 	templateCache  map[string]*template.Template
 	sessionManager *scs.SessionManager
 	punchSiteURL   string
+
+	// The summary tab's Print button shells out to the printsched binary,
+	// which needs the same database this process is using plus the address
+	// of the schedule listener on the home server.
+	dsn         string
+	printBinary string
+	printHost   string
+	printPort   int
 }
 
 func main() {
@@ -75,6 +83,10 @@ func main() {
 		templateCache:  templateCache,
 		sessionManager: sessionManager,
 		punchSiteURL:   cfg.PunchSiteURL,
+		dsn:            *dsn,
+		printBinary:    cfg.PrintBinary,
+		printHost:      cfg.PrintHost,
+		printPort:      cfg.PrintPort,
 	}
 
 	// The nightly sweep lives here rather than in the punch binary because

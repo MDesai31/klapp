@@ -33,6 +33,15 @@ type Config struct {
 	// PunchSiteURL is the worker-facing punch site's public URL, sent in
 	// the admin dashboard's "Notify" text message links.
 	PunchSiteURL string `json:"punch_site_url"`
+	// PrintHost and PrintPort address the schedule listener on the home
+	// server, reachable over WireGuard. The summary tab's Print button and
+	// the printsched binary both send there.
+	PrintHost string `json:"print_host"`
+	PrintPort int    `json:"print_port"`
+	// PrintBinary is the path the admin site runs to build and send a
+	// print job - the printsched binary, which sits next to the admin
+	// binary in a deploy.
+	PrintBinary string `json:"print_binary"`
 }
 
 // Default returns the built-in settings used when no config file exists.
@@ -44,6 +53,9 @@ func Default() Config {
 		PinCheckDelayMs:           250,
 		DailyPunchLimit:           3,
 		PunchSiteURL:              "https://work.klauslandscaping.com",
+		PrintHost:                 "10.9.0.7",
+		PrintPort:                 5555,
+		PrintBinary:               "./printsched",
 	}
 }
 

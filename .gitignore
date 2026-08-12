@@ -11,3 +11,14 @@
 /cmd/seedadmin/seedadmin
 /web
 /seedadmin
+/printsched
+
+# python
+__pycache__/
+*.pyc
+
+# schedule listener (deployed to the home server, see schedule_listener/README.md)
+/schedule_listener/config.json
+/schedule_listener/schedule-listener
+/schedule_listener/out/
+/schedule_listener/*.pdf

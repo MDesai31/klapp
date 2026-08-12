@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"klapp/internal/models"
@@ -130,4 +134,70 @@ func (app *application) adminSummaryBulkPunch(w http.ResponseWriter, r *http.Req
 
 	app.sessionManager.Put(r.Context(), "flash", bulkPunchFlash(in, out, models.DayLabel(day), res))
 	http.Redirect(w, r, back, http.StatusSeeOther)
+}
+
+// printExecTimeout bounds the printsched run. It sits under the server's
+// 60s WriteTimeout so a wedged listener produces a flash message rather
+// than a dropped connection.
+const printExecTimeout = 45 * time.Second
+
+// adminSummaryPrint sends this pay period's hours to the schedule listener
+// on the home server, which builds the printable PDFs.
+//
+// The work is done by the printsched binary rather than in this process:
+// it is the same command an admin can run from a shell, so there is one
+// definition of what a print job contains and one place to debug it.
+func (app *application) adminSummaryPrint(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	period := r.PostForm.Get("period")
+	if _, err := models.PayPeriodDays(period); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	back := "/admin/summary?period=" + url.QueryEscape(period)
+
+	ctx, cancel := context.WithTimeout(r.Context(), printExecTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, app.printBinary,
+		"-period", period,
+		"-host", app.printHost,
+		"-port", strconv.Itoa(app.printPort),
+		"-dsn", app.dsn,
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// printsched's own failures - nobody to print, listener down -
+		// are the admin's to see and act on, so they become a flash
+		// rather than a 500. Log the full output for the operator.
+		app.logger.Error("print job failed", "period", period, "err", err, "output", string(out))
+		app.sessionManager.Put(r.Context(), "flash", "Print failed: "+printFailureReason(out, err))
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+
+	app.logger.Info("print job sent", "period", period, "output", string(out))
+	app.sessionManager.Put(r.Context(), "flash", "Sent this pay period to the printer at "+app.printHost+".")
+	http.Redirect(w, r, back, http.StatusSeeOther)
+}
+
+// printFailureReason picks the one line worth showing an admin out of a
+// failed printsched run: its last line of output, which is where its own
+// error message lands. Falls back to the exec error when it produced none
+// (a missing binary, say).
+func printFailureReason(out []byte, err error) string {
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	last := strings.TrimSpace(lines[len(lines)-1])
+	last = strings.TrimPrefix(last, "printsched: ")
+	if last == "" {
+		return err.Error()
+	}
+	if len(last) > 200 {
+		last = last[:200] + "..."
+	}
+	return last
 }

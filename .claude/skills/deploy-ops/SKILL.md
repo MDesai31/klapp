@@ -22,8 +22,18 @@ The admin port is deliberately bound to all interfaces and deliberately not
 behind Caddy — it is reachable only over LAN/WireGuard, and that trust boundary
 is what justifies the admin site having no CSRF protection.
 
-`/opt/klapp` holds `admin`, `punch`, `invoice`, `ui/` (rsynced from the repo)
-and `db/klapp.db` — the live database. Never point a dev or test command at it.
+`/opt/klapp` holds `admin`, `punch`, `invoice`, `printsched`, `ui/` (rsynced
+from the repo) and `db/klapp.db` — the live database. Never point a dev or test
+command at it.
+
+`printsched` has no unit of its own: it is a short-lived command the admin
+site execs when someone presses Print on the summary tab (`print_binary` in
+`config.json`, `./printsched` by default, resolved against the unit's
+`WorkingDirectory=/opt/klapp`). It can also be run by hand:
+
+```bash
+cd /opt/klapp && ./printsched -period 2026-06-08
+```
 
 The pre-split `klapp` unit and its `/opt/klapp/web` binary are gone; the deploy
 scripts remove them on the first run after the split.
@@ -37,7 +47,7 @@ From the repo root, after committing:
 ./deploy/update.sh --with-punch   # ...and punch site ON
 ```
 
-Builds all three binaries into `/opt/klapp`, rsyncs `ui/`, refreshes the systemd
+Builds the four binaries into `/opt/klapp`, rsyncs `ui/`, refreshes the systemd
 units from the repo, restarts `klapp-admin` and `klapp-invoice`, and then
 `enable --now` / `disable --now`s `klapp-punch` per the flag. Needs sudo.
 
@@ -65,6 +75,24 @@ share `deploy/lib.sh`.
   flags them non-compliant; a restart between 9 PM and midnight re-runs a
   catch-up sweep on startup, by design (`runNightlyPunchOut` in
   `cmd/admin/sweep.go`).
+
+## The schedule listener is on a different machine
+
+Pressing Print does not finish on this box. `printsched` posts the pay period
+to `schedule-listener` on the home server (`10.9.0.7:5555`, over WireGuard),
+which runs `build_schedule.py` and writes the PDFs there. **`update.sh` does
+not touch it** — deploying that half is a separate, manual, cross-host job
+documented in `schedule_listener/README.md`. Its logs are on that machine:
+
+```bash
+curl http://10.9.0.7:5555/healthz              # -> ok
+ssh 10.9.0.7 'journalctl -u schedule-listener -f'
+```
+
+If Print fails, the admin site shows the reason as a flash and logs the whole
+`printsched` output at ERROR (`grep print` in `journalctl -u klapp-admin`).
+Connection refused there almost always means the listener is down or WireGuard
+is, not that anything in klapp broke.
 
 ## Status and logs
 

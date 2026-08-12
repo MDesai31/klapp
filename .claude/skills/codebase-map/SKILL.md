@@ -13,6 +13,7 @@ but a few are not, and there are faster ways to answer the common questions.
 | Question | Command | Why |
 |---|---|---|
 | What models/types exist? | `go doc klapp/internal/models` | ~110 words for all 17 types |
+| What's on the print wire? | `go doc klapp/internal/schedule` | The JSON both the sender and the listener import |
 | What can I call on a model? | `go doc klapp/internal/models.TimePunchModel` | ~150 words vs 755 lines of `time_punches.go` |
 | What fields/methods on a row type? | `go doc klapp/internal/models.DashboardRow` | Includes the doc comments |
 | What sentinel errors exist? | `go doc klapp/internal/models` (var block at top) | Or read `internal/models/errors.go`, 13 lines |
@@ -57,8 +58,13 @@ cmd/admin/         the LAN/WireGuard-only admin site (:8082)
   sweep.go         nightly 9 PM auto punch-out
 cmd/invoice/       separate binary, separate site (:8083), own templates
 cmd/seedadmin/     CLI to create/reset an admin login
+cmd/printsched/    CLI: one pay period -> JSON -> POST to the schedule listener
+schedule_listener/ the home server's half; own README, deployed to 10.9.0.7
+  main.go          HTTP server on :5555, POST /print + GET /healthz
+  build_schedule.py  draws the PDF (reportlab), blank or filled in
 internal/config/   Config + Load, shared by punch and admin
 internal/models/   one file per area; raw database/sql, no ORM
+internal/schedule/ the print job's JSON payload + Build (from models) + Send
 db/                Open, Migrate, and the embedded migrations
 db/migrations/     goose SQL migrations, applied on startup by every binary
 ui/html/pages/     one .tmpl per page, admin_*.tmpl and punch*.tmpl
@@ -66,6 +72,11 @@ ui/html/partials/  nav.tmpl (admin nav bar)
 deploy/            systemd units, Caddyfile, lib.sh + deploy/update scripts
 docs/              design docs: refactor.md, time_reporting_plan.md, security.md
 ```
+
+`schedule_listener/` is in this Go module but does not run on this box — it is
+built here and copied to the home server (`10.9.0.7`, over WireGuard). It shares
+`internal/schedule` with `cmd/printsched` on purpose, so the JSON on the wire
+has exactly one definition. See `schedule_listener/README.md`.
 
 Only `internal/` and `db/` are shared. Each `cmd/` is its own `package main`
 with its own `application` struct, `templateData`, template cache, and

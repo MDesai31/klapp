@@ -23,6 +23,7 @@ func (app *application) routes() http.Handler {
 	protected.HandleFunc("GET /admin/timesheet", app.adminTimesheet)
 	protected.HandleFunc("GET /admin/summary", app.adminSummary)
 	protected.HandleFunc("POST /admin/summary/punch/bulk", app.adminSummaryBulkPunch)
+	protected.HandleFunc("POST /admin/summary/print", app.adminSummaryPrint)
 	protected.HandleFunc("GET /admin/punches/new", app.adminAddPunchForm)
 	protected.HandleFunc("POST /admin/punches/new", app.adminAddPunch)
 	protected.HandleFunc("GET /admin/punches/{id}/edit", app.adminEditPunchForm)

@@ -33,6 +33,11 @@ build_binaries() {
 	go build -o "$APP_DIR/admin" ./cmd/admin
 	go build -o "$APP_DIR/punch" ./cmd/punch
 	go build -o "$APP_DIR/invoice" ./cmd/invoice
+	# printsched has no service of its own: the admin site's Print button
+	# runs it (print_binary in config.json, ./printsched by default,
+	# resolved against the unit's WorkingDirectory), and it can be run by
+	# hand from $APP_DIR too.
+	go build -o "$APP_DIR/printsched" ./cmd/printsched
 	rsync -a --delete ui/ "$APP_DIR/ui/"
 }
 

@@ -14,6 +14,12 @@
 </select>
 </p>
 
+<form method="POST" action="/admin/summary/print" class="inline">
+<input type="hidden" name="period" value="{{.CurrentPeriod}}">
+<button type="submit">Print schedules</button>
+</form>
+<p class="hint">Sends every active worker's hours for this pay period to the schedule listener on the home server, which builds and prints their sheets.</p>
+
 <form method="POST" action="/admin/summary/punch/bulk">
 <input type="hidden" name="period" value="{{.CurrentPeriod}}">
 <table>

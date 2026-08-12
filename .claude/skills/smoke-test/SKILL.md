@@ -1,6 +1,6 @@
 ---
 name: smoke-test
-description: Run klapp locally against a throwaway SQLite database on scratch ports and drive the admin or worker punch site with curl. Use to verify a change in the real running app, reproduce a bug end to end, or inspect rendered pages — anything beyond what `go test` covers. Handles seeding an admin and workers, session-authenticated requests, and cleanup.
+description: Run klapp locally against a throwaway SQLite database on scratch ports and drive the admin or worker punch site with curl. Use to verify a change in the real running app, reproduce a bug end to end, inspect rendered pages, or exercise the print path without reportlab — anything beyond what `go test` covers. Handles seeding an admin and workers, session-authenticated requests, and cleanup.
 ---
 
 # Smoke-testing klapp locally
@@ -67,6 +67,62 @@ curl -sS -X POST -d "pin=1111" http://localhost:14000/punch/in
 
 Each PIN check sleeps `pin_check_delay_ms` (250ms default), so worker-site
 requests are deliberately slow. Ten bad PINs from one IP triggers a lockout.
+
+## Test the print path
+
+The summary tab's Print button execs `printsched`, which POSTs to the schedule
+listener on the home server, which runs `build_schedule.py`. All three links can
+be exercised here — **this box has no reportlab and no pip**, so a stub stands in
+for it and dumps the table it would have drawn.
+
+```bash
+STUB=.claude/skills/smoke-test/scripts/reportlab-stub
+SCRATCH=/tmp/klapp-scratch
+
+# 1. the listener, with the stub reportlab on its PYTHONPATH
+go build -o $SCRATCH/schedule-listener ./schedule_listener
+cat > $SCRATCH/listener.json <<EOF
+{"addr": "127.0.0.1:15555", "python": "python3",
+ "script": "$PWD/schedule_listener/build_schedule.py",
+ "output_dir": "$SCRATCH/out", "print_command": []}
+EOF
+( cd $SCRATCH && PYTHONPATH=$PWD/$STUB ./schedule-listener -config listener.json > listener.log 2>&1 & )
+
+# 2. point the scratch admin site at it (scratch-up.sh does not do this for you)
+cat > $SCRATCH/config.json <<'EOF'
+{"print_host": "127.0.0.1", "print_port": 15555,
+ "print_binary": "/tmp/klapp-scratch/printsched"}
+EOF
+go build -o $SCRATCH/printsched ./cmd/printsched
+#   ...then restart the scratch admin with -config /tmp/klapp-scratch/config.json
+
+# 3. press the button
+.claude/skills/smoke-test/scripts/admin-curl.sh /admin/summary/print \
+  -d "period=2026-06-08" | grep '<p class="flash"'
+
+rm -f $SCRATCH/schedule-rows.txt   # before each run; the stub appends
+cat $SCRATCH/schedule-rows.txt     # the rows each sheet would print
+```
+
+`printsched` alone is enough to test the wire without a browser or a session:
+
+```bash
+$SCRATCH/printsched -period 2026-06-08 -host 127.0.0.1 -port 15555 \
+  -dsn "file:$SCRATCH/klapp.db?_pragma=busy_timeout(5000)" -config /nonexistent.json
+```
+
+Notes:
+
+- **`-config /nonexistent.json` is deliberate** — it forces built-in defaults
+  rather than picking up a real `config.json` pointing at `10.9.0.7`. Getting
+  this wrong sends a live print job to the home server.
+- **Seed multi-punch and open-punch days by hand** (`sqlite3` INSERTs into
+  `time_punches`), since that is what exercises the spill rows under `TOTAL`.
+  `scratch-up.sh`'s workers are all punched out with no history.
+- **The stub reports `rows=`, `heights=` and `min_row_h=`** per sheet. The two
+  counts must match, and `min_row_h` shrinking is how you confirm a sheet with
+  many spill rows still fits its half page.
+- **A blank sheet is 21 rows.** Anything else means the spill rows grew.
 
 ## Inspect the database directly
 

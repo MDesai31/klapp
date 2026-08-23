@@ -5,7 +5,7 @@
 Three-part addition to the klapp binary suite:
 
 1. **`cmd/invoice`** — a new worker-facing binary on port 8083 (VPN/LAN only) where workers submit job invoices via a PIN-authenticated form.
-2. **Admin invoice tab** — admin site (`cmd/web`, port 8082) gains Invoices, Customers, and Catalog tabs for reviewing and approving submitted invoices.
+2. **Admin invoice tab** — admin site (`cmd/admin`, port 8082) gains Invoices, Customers, and Catalog tabs for reviewing and approving submitted invoices.
 3. **4 new DB migrations** (0005–0008) adding the customers, job_descriptions, materials, invoices, invoice_jobs, and invoice_materials_used tables.
 
 ---
@@ -20,7 +20,7 @@ go run ./cmd/invoice
 go run ./cmd/invoice -addr=:8083 -dsn="file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
 ```
 
-Runs migrations on startup (same `db/migrations/` embed as `cmd/web`; goose is idempotent so both binaries can run simultaneously).
+Runs migrations on startup (same `db/migrations/` embed as `cmd/punch`/`cmd/admin`; goose is idempotent so all binaries can run simultaneously).
 
 ### Flow
 
@@ -80,7 +80,7 @@ invoice_materials_used (id, invoice_id → invoices.id, material)
 
 ---
 
-## Admin additions (`cmd/web`)
+## Admin additions (`cmd/admin`)
 
 Three new tabs in the admin nav:
 

@@ -23,6 +23,16 @@ link, possibly including their PIN. From `todo.md` Medium + `notification.md`. R
 in flight: `feature/sms-notifications` branch and the Twilio A2P 10DLC registration pages
 (added 412c8859, reverted on main in 49617bb2 pending registration).
 
+Progress 2026-08-22: split in two. **Manual admin trigger — done** on main via the dashboard
+Notify link (`DashboardRow.NotifyLink`, 176986de→f2caf3d6, in [[A-20260812-admin-bulk-punch-notify]]):
+an `sms:` deep link that opens the admin's own phone messaging app with the punch-out URL +
+PIN prefilled in the worker's language — no Twilio, no registration needed. **5 PM automatic
+send — still open**, blocked on Twilio A2P 10DLC registration. `feature/sms-notifications`
+(Thomas, 2 commits, last touched 2026-06-29, unmerged) holds the building blocks: `internal/sms`
+Twilio `Send()`, `cmd/sms` manual CLI, `setup_sms.md`, and the `/privacy` + `/terms` pages
+registration requires. It predates the binary split, so reviving it means rebasing onto
+`cmd/punch`/`cmd/admin` and wiring the send into the sweep goroutine in `cmd/admin`.
+
 ### A-20260809-admin-csrf — Add CSRF protection to admin POST endpoints
 - Workstream: security
 - Status: open

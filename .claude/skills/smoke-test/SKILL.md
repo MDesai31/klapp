@@ -58,12 +58,18 @@ $S/admin-curl.sh /admin/punch/bulk -d "action=bogus" -o /dev/null -w "%{http_cod
 
 ## Drive the worker punch site
 
-No session needed — the worker's PIN is posted with each request:
+The PIN is posted once, to `/punch`; that sets a short-lived `punch_session`
+cookie holding the worker ID, and `/punch/in` and `/punch/out` read the worker
+from that cookie (the PIN is never resent — see `docs/reference/security.md`).
+So carry a cookie jar across the calls:
 
 ```bash
-curl -sS -X POST -d "pin=1111" http://localhost:14000/punch | grep -E 'flash|button'
-curl -sS -X POST -d "pin=1111" http://localhost:14000/punch/in
+J=$(mktemp)
+curl -sS -c "$J" -d "pin=1111" http://localhost:14000/punch | grep -E 'flash|button'
+curl -sS -b "$J" -d "" http://localhost:14000/punch/in
 ```
+
+Hitting `/punch/in` without the cookie just re-renders the PIN form.
 
 Each PIN check sleeps `pin_check_delay_ms` (250ms default), so worker-site
 requests are deliberately slow. Ten bad PINs from one IP triggers a lockout.

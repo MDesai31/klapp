@@ -6,15 +6,18 @@ own phones, cellular only, no job-site wifi), admin site is LAN/WireGuard-only.
 
 ## Open issues
 
-### High: PIN echoed into page HTML
-`ui/html/pages/punch.tmpl:20,27` — after a worker authenticates, their PIN is
-written into a hidden form field (`<input type="hidden" name="pin" value="{{.PIN}}">`)
-and resubmitted on punch in/out. Visible in page source, browser history, and
-any proxy logs. Fix: hold `workerID` server-side (session) instead of
-round-tripping the PIN through the client. The punch site currently has no
-session middleware at all (`cmd/punch/routes.go` doesn't wrap with
-`sessionManager.LoadAndSave`, unlike `cmd/admin/routes.go`) — and since the
-split, the punch binary has no session manager at all.
+### Fixed: PIN echoed into page HTML
+`ui/html/pages/punch.tmpl` — after a worker authenticated, their PIN was
+written into a hidden form field and resubmitted on punch in/out — visible in
+page source, browser history, and any proxy logs. Fixed as recommended: the
+punch site now runs its own scs session middleware (`punchSessions`, 30-min
+lifetime, cookie `punch_session` so it can't collide with the admin session
+on a shared host). `punchStatus` stores the worker ID server-side after PIN
+auth; punch in/out resolve the worker from the session (`sessionWorker` in
+`cmd/punch/handlers.go`) and fall back to the PIN form when the session
+is missing, expired, or the worker was deactivated mid-session. The PIN no
+longer appears in any page HTML. The late punch-out flow was already safe
+(PIN typed per submission, never echoed).
 
 ### Medium: No CSRF protection on admin POST endpoints
 `cmd/admin/handlers_workers.go`, `cmd/admin/handlers_timesheet.go` — admin
@@ -22,9 +25,12 @@ forms (create/edit worker, toggle active, edit punch) have no CSRF tokens.
 Low real-world risk since admin is WireGuard/LAN-only, but cheap to add for
 defense in depth (e.g. `gorilla/csrf`).
 
-### Medium: PIN field is plaintext in admin panel
-`ui/html/pages/admin_workers.tmpl:31` — PIN input is `type="text"`, not
-`type="password"`, so it's visible on-screen when an admin enters/edits it.
+### Fixed: PIN field is plaintext in admin panel
+`ui/html/pages/admin_workers.tmpl`, `admin_edit_worker.tmpl` — PIN inputs
+were `type="text"`, visible on-screen when an admin entered/edited them.
+Now `type="password"`. (The edit form still prefills the current PIN as the
+input's value — masked on-screen, but present in the page source; acceptable
+on the LAN/WireGuard-only admin site, and inherent to the edit-in-place UX.)
 
 ### Fixed: No lockout on repeated failed PIN attempts
 `internal/models/workers.go` (`WorkerModel.Authenticate`) — worker PINs are

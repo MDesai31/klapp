@@ -89,8 +89,9 @@ with its own `application` struct, `templateData`, template cache, and
 → `ui/html/pages/page.tmpl` wrapped by `base.tmpl`.
 
 Admin routes live on a `protected` mux behind `requireAdmin`; the login page and
-static files sit outside it. The punch site has no sessions and no middleware at
-all — the worker's PIN is posted with every request.
+static files sit outside it. The punch site's only middleware is its own short-lived
+scs session (`punchSessions`, cookie `punch_session`): the PIN is posted once to
+`/punch`, the worker ID is held server-side, and punch in/out read it from there.
 
 Both sites serve `./ui/static/` and read templates from `./ui/html/`, so both
 must run from a directory containing `ui/`.

@@ -17,14 +17,12 @@
 {{if .OpenPunch}}
 <p>{{if .Spanish}}Entrada a las{{else}}Punched in at{{end}} {{.OpenPunch.StartTime.Local.Format "3:04 PM"}}</p>
 <form id="punch-form" action="/punch/out" method="POST">
-    <input type="hidden" name="pin" value="{{.PIN}}">
     <input type="hidden" name="lat">
     <input type="hidden" name="lon">
     <button type="submit" class="btn btn-out">{{if .Spanish}}Registrar Salida{{else}}Punch Out{{end}}</button>
 </form>
 {{else}}
 <form id="punch-form" action="/punch/in" method="POST">
-    <input type="hidden" name="pin" value="{{.PIN}}">
     <input type="hidden" name="lat">
     <input type="hidden" name="lon">
     <button type="submit" class="btn btn-in">{{if .Spanish}}Registrar Entrada{{else}}Punch In{{end}}</button>

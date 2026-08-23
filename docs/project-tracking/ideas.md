@@ -8,7 +8,7 @@ Future intents — captured by `/project-plan`, not started. Scope before acting
 - Priority: low
 - Intended start: someday
 - Why/context: divide invoicing and time-keeping concerns more clearly — own site or section. From `todo.md` Low.
-- To start, future-us needs: decide site vs section; routes live in `cmd/web/routes.go`.
+- To start, future-us needs: decide site vs section; routes live in `cmd/admin/routes.go`.
 
 ### punch-map-visualization — Map tab of punch-out locations
 - Workstream: admin

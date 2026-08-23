@@ -4,12 +4,16 @@ Internal field-operations tool for a landscaping company. Workers punch in/out
 from their phones; admins review timesheets, manage invoices, and track hours
 over LAN/WireGuard.
 
-Go + SQLite. Two binaries:
+Go + SQLite. Three binaries over one database, each serving one site:
 
 | Binary | Default port | Who reaches it |
 |---|---|---|
-| `cmd/web` — worker punch + admin site | `:4000` (worker), `:8082` (admin) | worker site is public via Caddy; admin is LAN/WireGuard only |
+| `cmd/punch` — worker punch site | `:4000` | public via Caddy (HTTPS) |
+| `cmd/admin` — admin site | `:8082` | LAN/WireGuard only |
 | `cmd/invoice` — invoice submission | `:8083` | LAN/WireGuard only |
+
+The punch site is the only internet-facing surface, and it is deployed
+**off by default** — `deploy/update.sh` needs `--with-punch` to turn it on.
 
 ---
 
@@ -26,9 +30,12 @@ Go + SQLite. Two binaries:
 ### Run locally
 
 ```bash
-go run ./cmd/web        # worker site :4000  +  admin site :8082
+go run ./cmd/punch      # worker punch site :4000
+go run ./cmd/admin      # admin site :8082
 go run ./cmd/invoice    # invoice site :8083
 ```
+
+Each is a standalone process; run only the ones you need.
 
 SQLite migrations run automatically on startup. The database file (`db/klapp.db`)
 is created on first run and is gitignored.
@@ -45,14 +52,12 @@ Then open http://localhost:8082/admin/login.
 
 ### Scratch ports
 
-The production service already occupies `:4000` / `:8082` / `:8083`. Use
+The production services already occupy `:4000` / `:8082` / `:8083`. Use
 different ports and a temp DB for ad-hoc testing so you don't collide:
 
 ```bash
-go run ./cmd/web \
-  -addr=:14000 \
-  -admin-addr=:18082 \
-  -dsn="file:/tmp/x.db?_pragma=foreign_keys(1)"
+go run ./cmd/punch -addr=:14000 -dsn="file:/tmp/x.db?_pragma=foreign_keys(1)"
+go run ./cmd/admin -addr=:18082 -dsn="file:/tmp/x.db?_pragma=foreign_keys(1)"
 ```
 
 Kill the child process by PID after — `kill %1` only stops `go run`, not the
@@ -75,58 +80,24 @@ tests are fully isolated and can run in parallel.
 
 1. **Clone the repo** on the server (e.g. to `~/klapp`).
 
-2. **Create the app directory** and build the binaries:
+2. **Run the setup script** from the project root. It creates `/opt/klapp`,
+   builds all three binaries, rsyncs `ui/`, installs and enables the systemd
+   units, and installs/configures Caddy:
 
    ```bash
-   sudo mkdir -p /opt/klapp/db
-   sudo chown -R "$(whoami):$(whoami)" /opt/klapp
-   go build -o /opt/klapp/web ./cmd/web
-   go build -o /opt/klapp/invoice ./cmd/invoice
-   rsync -a --delete ui/ /opt/klapp/ui/
-   ```
-
-3. **Symlink the systemd units** — linking instead of copying means edits to
-   the repo files take effect after a `daemon-reload`, with no re-copy step:
-
-   ```bash
-   sudo ln -s /opt/klapp/deploy/klapp.service         /etc/systemd/system/klapp.service
-   sudo ln -s /opt/klapp/deploy/klapp-invoice.service /etc/systemd/system/klapp-invoice.service
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now klapp
-   sudo systemctl enable --now klapp-invoice
-   ```
-
-4. **Install Caddy** (if not already present):
-
-   ```bash
-   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-     | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-     | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-   sudo apt update && sudo apt install -y caddy
-   ```
-
-5. **Symlink the Caddyfile**:
-
-   ```bash
-   sudo ln -sf /opt/klapp/deploy/Caddyfile /etc/caddy/Caddyfile
-   sudo systemctl enable --now caddy
-   sudo systemctl reload caddy
+   ./deploy/deploy.sh                # admin + invoice sites
+   ./deploy/deploy.sh --with-punch   # ...and the public worker punch site
    ```
 
    The Caddyfile proxies `work.klauslandscaping.com` → `localhost:4000`. Caddy
-   handles TLS automatically.
+   handles TLS automatically. With the punch site disabled, that hostname
+   returns 502 by design.
 
-6. **Seed the first admin** (one-time). Stop the service, run seedadmin against
-   the live DB, then restart:
+3. **Seed the first admin** (one-time), straight against the live DB:
 
    ```bash
-   sudo systemctl stop klapp
-   /opt/klapp/web -dsn="file:/opt/klapp/db/klapp.db?_pragma=foreign_keys(1)" &
-   go run ~/klapp/cmd/seedadmin -username admin -password <something>
-   kill %1
-   sudo systemctl start klapp
+   go run ~/klapp/cmd/seedadmin -username admin -password <something> \
+     -dsn="file:/opt/klapp/db/klapp.db?_pragma=foreign_keys(1)"
    ```
 
 ### Updating an existing deployment
@@ -134,26 +105,22 @@ tests are fully isolated and can run in parallel.
 ```bash
 cd ~/klapp
 git pull
-go build -o /opt/klapp/web ./cmd/web
-go build -o /opt/klapp/invoice ./cmd/invoice
-rsync -a --delete ui/ /opt/klapp/ui/
-sudo systemctl restart klapp
-sudo systemctl restart klapp-invoice
+./deploy/update.sh                # rebuild + restart; punch site stays OFF
+./deploy/update.sh --with-punch   # rebuild + restart; punch site ON
 ```
 
-Or use the convenience script (run from the project root):
-
-```bash
-bash deploy/update.sh
-```
+`update.sh` rebuilds all three binaries, rsyncs `ui/`, refreshes the systemd
+units from the repo, and then enables or disables `klapp-punch` according to
+the flag. **Whether the punch site runs is decided by this flag on every
+deploy** — a plain `./deploy/update.sh` turns it off.
 
 ### Network layout
 
-| Site | Bind | Reachable from |
-|---|---|---|
-| Worker punch site | `127.0.0.1:4000` | Public via Caddy (HTTPS) |
-| Admin site | `0.0.0.0:8082` | LAN / WireGuard only — **do not expose publicly** |
-| Invoice site | `0.0.0.0:8083` | LAN / WireGuard only — **do not expose publicly** |
+| Site | Unit | Bind | Reachable from |
+|---|---|---|---|
+| Worker punch site | `klapp-punch` | `127.0.0.1:4000` | Public via Caddy (HTTPS) — **off unless deployed with `--with-punch`** |
+| Admin site | `klapp-admin` | `0.0.0.0:8082` | LAN / WireGuard only — **do not expose publicly** |
+| Invoice site | `klapp-invoice` | `0.0.0.0:8083` | LAN / WireGuard only — **do not expose publicly** |
 
 ---
 

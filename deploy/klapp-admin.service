@@ -1,12 +1,12 @@
 [Unit]
-Description=Klaus Field Log (worker + admin site)
+Description=Klaus Field Log (admin site)
 After=network.target
 
 [Service]
 Type=simple
 User=tklaus
 WorkingDirectory=/opt/klapp
-ExecStart=/opt/klapp/web -addr=127.0.0.1:4000 -admin-addr=:8082
+ExecStart=/opt/klapp/admin -addr=:8082
 Restart=always
 RestartSec=5
 

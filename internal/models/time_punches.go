@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -66,6 +67,9 @@ func (p TimePunch) EndTimeInputValue() string {
 type DashboardRow struct {
 	WorkerID   int
 	WorkerName string
+	Phone      string
+	PIN        string
+	Language   string
 	PunchID    sql.NullInt64
 	StartTime  sql.NullString
 	EndTime    sql.NullString
@@ -89,6 +93,74 @@ func (r DashboardRow) StatusLabel() string {
 		return "?"
 	}
 	return fmt.Sprintf("Out at %s (%s worked)", end.Local().Format("3:04 PM"), formatDuration(end.Sub(start)))
+}
+
+// PunchedIn reports whether the worker is currently on the clock, i.e. has
+// a punch for the day that hasn't been closed yet.
+func (r DashboardRow) PunchedIn() bool {
+	return r.StartTime.Valid && !r.EndTime.Valid
+}
+
+// NotifyLink builds an "sms:" URI, pre-filled with a punch-in or punch-out
+// reminder (whichever the worker currently needs) in their preferred
+// language, addressed to their phone number. Returns "" if the worker has
+// no phone number on file. baseURL is the worker punch site's public URL.
+//
+// The query string uses "?&body=" rather than a plain "?body=", since some
+// iOS versions only honor "&body=" - the combined form is a well-known
+// cross-platform trick that satisfies both parsers.
+func (r DashboardRow) NotifyLink(baseURL string) string {
+	phone := smsPhone(r.Phone)
+	if phone == "" {
+		return ""
+	}
+
+	punchedIn := r.PunchedIn()
+	spanish := r.Language != "english"
+
+	var text string
+	switch {
+	case punchedIn && spanish:
+		text = fmt.Sprintf("Hola %s, por favor marca tu salida en: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	case punchedIn:
+		text = fmt.Sprintf("Hello %s, please punch out at: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	case spanish:
+		text = fmt.Sprintf("Hola %s, por favor marca tu entrada en: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	default:
+		text = fmt.Sprintf("Hello %s, please punch in at: %s. PIN: %s", r.WorkerName, baseURL, r.PIN)
+	}
+
+	return fmt.Sprintf("sms:%s?&body=%s", phone, smsEscape(text))
+}
+
+// SMSPhone returns the worker's phone number normalized for use in an sms:
+// URI (digits and a leading '+' only), or "" if none is on file.
+func (r DashboardRow) SMSPhone() string {
+	return smsPhone(r.Phone)
+}
+
+// smsEscape percent-encodes text for use in an sms: URI's body param.
+// url.QueryEscape encodes spaces as '+', which is correct for form bodies
+// but renders as a literal '+' rather than a space in a text message body -
+// so spaces need %20 instead.
+func smsEscape(text string) string {
+	return strings.ReplaceAll(url.QueryEscape(text), "+", "%20")
+}
+
+// smsPhone strips everything but digits and a leading '+' from a
+// free-typed phone number, so it's safe to drop into an sms: URI.
+func smsPhone(phone string) string {
+	var b strings.Builder
+	for i, c := range phone {
+		if c == '+' && i == 0 {
+			b.WriteRune(c)
+			continue
+		}
+		if c >= '0' && c <= '9' {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
 }
 
 // formatDuration renders a duration as "Xh Ym", or just "Ym" under an hour.
@@ -286,6 +358,62 @@ func (m *TimePunchModel) PunchOut(workerID int, lat, lon *float64, now time.Time
 	return nil
 }
 
+// AdminPunchOut closes the worker's open punch at a time the admin typed
+// in rather than at "now", and flags the punch as admin-modified.
+//
+// PunchOut can stamp its end time unchecked because the clock only ever
+// moves forward past the punch-in; a hand-entered time can land before it,
+// so the start is checked here. Returns ErrNoRecord if the worker has
+// nothing open, ErrEndBeforeStart if endTime is not after the start.
+func (m *TimePunchModel) AdminPunchOut(workerID int, endTime time.Time) error {
+	open, err := m.Open(workerID)
+	if err != nil {
+		return err
+	}
+
+	if !endTime.After(open.StartTime) {
+		return ErrEndBeforeStart
+	}
+
+	_, err = m.DB.Exec(`UPDATE time_punches SET end_time = ?, modified_by_admin = TRUE WHERE id = ?`,
+		endTime.UTC().Format(time.RFC3339), open.ID)
+	return err
+}
+
+// AdminPunchOutDay is the day-scoped twin of AdminPunchOut, for the
+// summary tab's bulk punch: it closes the punch the worker has open on day
+// ("2006-01-02") rather than whichever punch they have open right now.
+// The two are the same thing when day is today, but on the summary the
+// admin is usually filling in a day that has already passed, and closing
+// today's punch instead would be plainly wrong. Returns ErrNoRecord if the
+// worker has nothing open on that day, ErrEndBeforeStart if endTime is not
+// after the punch's start.
+func (m *TimePunchModel) AdminPunchOutDay(workerID int, day string, endTime time.Time) error {
+	var id int
+	var start string
+	err := m.DB.QueryRow(`
+		SELECT id, start_time FROM time_punches
+		WHERE worker_id = ? AND day = ? AND end_time IS NULL`, workerID, day).Scan(&id, &start)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNoRecord
+	}
+	if err != nil {
+		return err
+	}
+
+	startTime, err := time.Parse(time.RFC3339, start)
+	if err != nil {
+		return err
+	}
+	if !endTime.After(startTime) {
+		return ErrEndBeforeStart
+	}
+
+	_, err = m.DB.Exec(`UPDATE time_punches SET end_time = ?, modified_by_admin = TRUE WHERE id = ?`,
+		endTime.UTC().Format(time.RFC3339), id)
+	return err
+}
+
 // PunchOutLate records a worker's real end time via the late-notice link.
 // No location is captured - the worker is just entering a finish time after
 // the fact. It closes the worker's open punch if one exists; otherwise it
@@ -407,7 +535,7 @@ func (m *TimePunchModel) AdminUpdate(id int, startTime, endTime time.Time) error
 // DashboardStatus reports every active worker's punch status for the
 // given day ("2006-01-02") - in, out, or not punched in at all.
 func (m *TimePunchModel) DashboardStatus(day string) ([]DashboardRow, error) {
-	stmt := `SELECT w.id, w.worker_name, tp.id, tp.start_time, tp.end_time
+	stmt := `SELECT w.id, w.worker_name, COALESCE(w.phone, ''), w.pin, w.language, tp.id, tp.start_time, tp.end_time
 		FROM workers w
 		LEFT JOIN time_punches tp ON tp.worker_id = w.id AND tp.day = ?
 		WHERE w.active = TRUE
@@ -422,7 +550,7 @@ func (m *TimePunchModel) DashboardStatus(day string) ([]DashboardRow, error) {
 	var out []DashboardRow
 	for rows.Next() {
 		var r DashboardRow
-		if err := rows.Scan(&r.WorkerID, &r.WorkerName, &r.PunchID, &r.StartTime, &r.EndTime); err != nil {
+		if err := rows.Scan(&r.WorkerID, &r.WorkerName, &r.Phone, &r.PIN, &r.Language, &r.PunchID, &r.StartTime, &r.EndTime); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -668,9 +796,11 @@ func (m *TimePunchModel) AdminCreate(workerID int, startTime, endTime time.Time)
 		end = endTime.UTC().Format(time.RFC3339)
 	}
 
+	// Coords stay NULL: nobody was at a location, and 0,0 would render as
+	// a map link to Null Island on the timesheet.
 	stmt := `INSERT INTO time_punches
 		(worker_id, pay_period, day, start_time, end_time, start_lat, start_lon, modified_by_admin)
-		VALUES (?, ?, ?, ?, ?, 0, 0, TRUE)`
+		VALUES (?, ?, ?, ?, ?, NULL, NULL, TRUE)`
 	result, err := m.DB.Exec(stmt, workerID, payPeriod, day, startTime.UTC().Format(time.RFC3339), end)
 	if isOpenPunchConflict(err) {
 		return 0, ErrAlreadyOpen

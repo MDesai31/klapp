@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"html/template"
 	"log/slog"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/pressly/goose/v3"
 	"klapp/db"
 	"klapp/internal/models"
 
@@ -29,19 +27,19 @@ type application struct {
 
 func main() {
 	addr := flag.String("addr", ":8083", "invoice site HTTP network address (LAN/WireGuard only)")
-	dsn := flag.String("dsn", "file:db/klapp.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", "SQLite data source name")
+	dsn := flag.String("dsn", db.DefaultDSN, "SQLite data source name")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	sqlDB, err := openDB(*dsn)
+	sqlDB, err := db.Open(*dsn)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
 	defer sqlDB.Close()
 
-	if err := migrate(sqlDB); err != nil {
+	if err := db.Migrate(sqlDB); err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
@@ -78,24 +76,4 @@ func main() {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
-}
-
-func openDB(dsn string) (*sql.DB, error) {
-	sqlDB, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, err
-	}
-	if err := sqlDB.Ping(); err != nil {
-		sqlDB.Close()
-		return nil, err
-	}
-	return sqlDB, nil
-}
-
-func migrate(sqlDB *sql.DB) error {
-	goose.SetBaseFS(db.Migrations)
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		return err
-	}
-	return goose.Up(sqlDB, "migrations")
 }

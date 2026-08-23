@@ -1,0 +1,7 @@
+{
+  "addr": "10.9.0.7:5555",
+  "python": "/home/tklaus/venv/bin/python3",
+  "script": "/opt/schedule-listener/build_schedule.py",
+  "output_dir": "/opt/schedule-listener/out",
+  "print_command": ["lp", "-d", "HP_OfficeJet_9120e"]
+}

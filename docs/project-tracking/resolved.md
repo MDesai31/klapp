@@ -141,3 +141,41 @@ Imported from git history by /tracking-adopt git.
 First made email failure block the reviewed flag, then reversed: mark reviewed even when the
 email fails, but tell the admin so (see [[invoice-review-flow]]).
 Imported from git history by /tracking-adopt git.
+
+### A-20260812-binary-split — Split the punch and admin sites into separate binaries
+- Workstream: ops
+- Status: done
+- Created: 2026-08-10
+- Completed: 2026-08-12
+- Commit: ad2be917 (plus e9ff19c8 project skills)
+
+`cmd/web` became `cmd/punch` (public worker site, `:4000`) and `cmd/admin` (LAN/WireGuard
+admin site, `:8082`), independent processes; the 9 PM sweep moved to `cmd/admin`, the always-on
+binary. Deploy units renamed `klapp-punch.service` / `klapp-admin.service`. Also added
+`.claude/skills/` (codebase-map, feature-slice, smoke-test, deploy-ops).
+Thomas's work on `refactor/go-rewrite`; imported at integration into main.
+
+### A-20260812-admin-bulk-punch-notify — Admin dashboard bulk punch in/out + Notify buttons
+- Workstream: time-tracking
+- Status: done
+- Created: 2026-08-10
+- Completed: 2026-08-12
+- Commit: 176986de, 04593e85, f2caf3d6, 69961d2b, 98865ae2, 20126037
+
+Per-worker Notify button on the dashboard, then bulk punch in/out (time in, time out, or
+both) replacing bulk Notify Selected; the Summary tab gained its own bulk punch for any day
+of the period. Punch site now requests geolocation on submit instead of page load.
+Partial overlap with [[A-20260809-sms-punchout-notifications]] (manual admin trigger path).
+Thomas's work on `refactor/go-rewrite`; imported at integration into main.
+
+### A-20260812-schedule-printing — Print a pay period's schedules from the Summary tab
+- Workstream: admin
+- Status: done
+- Created: 2026-08-11
+- Completed: 2026-08-12
+- Commit: 3fbcf019, 1d485522, 1ed5ddb3
+
+New `cmd/printsched` builds a pay-period payload (`internal/schedule`) and posts it to
+`schedule_listener/` on the home server, which renders PDFs with reportlab
+(`build_schedule.py`, unit-tested). Design in `docs/design/printPlan.md`.
+Thomas's work on `refactor/go-rewrite`; imported at integration into main.

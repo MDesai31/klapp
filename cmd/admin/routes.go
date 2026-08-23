@@ -2,26 +2,9 @@ package main
 
 import "net/http"
 
-func (app *application) routes() http.Handler {
-	mux := http.NewServeMux()
-
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
-
-	mux.HandleFunc("GET /{$}", app.punchForm)
-	mux.HandleFunc("GET /punch", app.punchForm)
-	mux.HandleFunc("POST /punch", app.punchStatus)
-	mux.HandleFunc("POST /punch/in", app.punchIn)
-	mux.HandleFunc("POST /punch/out", app.punchOut)
-	mux.HandleFunc("GET /punch/late", app.punchLateForm)
-	mux.HandleFunc("POST /punch/late", app.punchLate)
-
-	return mux
-}
-
-// adminRoutes serves the LAN/WireGuard-only admin site. Everything under
+// routes serves the LAN/WireGuard-only admin site. Everything under
 // /admin/ except the login page itself requires a logged-in admin session.
-func (app *application) adminRoutes() http.Handler {
+func (app *application) routes() http.Handler {
 	mux := http.NewServeMux()
 
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
@@ -36,8 +19,11 @@ func (app *application) adminRoutes() http.Handler {
 	protected := http.NewServeMux()
 	protected.HandleFunc("GET /admin/{$}", app.adminDashboard)
 	protected.HandleFunc("POST /admin/logout", app.adminLogout)
+	protected.HandleFunc("POST /admin/punch/bulk", app.adminBulkPunch)
 	protected.HandleFunc("GET /admin/timesheet", app.adminTimesheet)
 	protected.HandleFunc("GET /admin/summary", app.adminSummary)
+	protected.HandleFunc("POST /admin/summary/punch/bulk", app.adminSummaryBulkPunch)
+	protected.HandleFunc("POST /admin/summary/print", app.adminSummaryPrint)
 	protected.HandleFunc("GET /admin/punches/new", app.adminAddPunchForm)
 	protected.HandleFunc("POST /admin/punches/new", app.adminAddPunch)
 	protected.HandleFunc("GET /admin/punches/{id}/edit", app.adminEditPunchForm)

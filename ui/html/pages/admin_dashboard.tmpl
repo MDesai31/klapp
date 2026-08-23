@@ -3,14 +3,75 @@
 {{define "main"}}
 {{template "nav" .}}
 
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
 <h1>Today</h1>
+<form method="POST" action="/admin/punch/bulk">
 <table>
-<tr><th>Worker</th><th>Status</th></tr>
+<tr><th><input type="checkbox" id="punch-select-all"></th><th>Worker</th><th>Status</th><th></th></tr>
 {{range .DashboardRows}}
 <tr{{if not .StartTime.Valid}} class="not-in"{{end}}>
+    <td>
+    <input type="checkbox" class="punch-check" name="worker_id" value="{{.WorkerID}}">
+    </td>
     <td>{{.WorkerName}}</td>
     <td>{{.StatusLabel}}</td>
+    <td>
+    {{$link := .NotifyLink $.NotifyBaseURL}}
+    {{if $link}}<a href="{{$link | safeURL}}">Notify</a>{{end}}
+    </td>
 </tr>
 {{end}}
 </table>
+<div class="punch-times">
+    <div>
+    <label for="time-in">Time in</label>
+    <input type="time" id="time-in" name="time_in">
+    </div>
+    <div>
+    <label for="time-out">Time out</label>
+    <input type="time" id="time-out" name="time_out">
+    </div>
+</div>
+<button type="submit" id="punch-selected" disabled>Punch In / Punch Out</button>
+<p class="hint">Fill in one time, the other, or both: both records a whole shift. Times apply to today, and mark the punch as admin-entered. Leave both blank to punch at the current time.</p>
+</form>
+
+<script>
+(function () {
+    var checks = document.querySelectorAll(".punch-check");
+    var selectAll = document.getElementById("punch-select-all");
+    var button = document.getElementById("punch-selected");
+    var timeIn = document.getElementById("time-in");
+    var timeOut = document.getElementById("time-out");
+
+    // Typical days start at 8, so a blank field fills itself in the moment
+    // it's touched; the admin only has to change it when the day was odd,
+    // and an untouched field stays blank and means "don't punch that end".
+    [[timeIn, "08:00"], [timeOut, "17:00"]].forEach(function (pair) {
+        pair[0].addEventListener("focus", function () {
+            if (!pair[0].value) pair[0].value = pair[1];
+        });
+    });
+
+    // The times decide what the punch is, so the button only cares that
+    // somebody is selected.
+    function updateButton() {
+        button.disabled = ![].some.call(checks, function (c) {
+            return c.checked;
+        });
+    }
+
+    checks.forEach(function (c) {
+        c.addEventListener("change", updateButton);
+    });
+
+    selectAll.addEventListener("change", function () {
+        checks.forEach(function (c) {
+            c.checked = selectAll.checked;
+        });
+        updateButton();
+    });
+})();
+</script>
 {{end}}

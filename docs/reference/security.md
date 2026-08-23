@@ -12,11 +12,12 @@ written into a hidden form field (`<input type="hidden" name="pin" value="{{.PIN
 and resubmitted on punch in/out. Visible in page source, browser history, and
 any proxy logs. Fix: hold `workerID` server-side (session) instead of
 round-tripping the PIN through the client. The punch site currently has no
-session middleware at all (`cmd/web/routes.go` doesn't wrap with
-`sessionManager.LoadAndSave`, unlike `adminRoutes()`).
+session middleware at all (`cmd/punch/routes.go` doesn't wrap with
+`sessionManager.LoadAndSave`, unlike `cmd/admin/routes.go`) — and since the
+split, the punch binary has no session manager at all.
 
 ### Medium: No CSRF protection on admin POST endpoints
-`cmd/web/handlers_admin_workers.go`, `handlers_admin_timesheet.go` — admin
+`cmd/admin/handlers_workers.go`, `cmd/admin/handlers_timesheet.go` — admin
 forms (create/edit worker, toggle active, edit punch) have no CSRF tokens.
 Low real-world risk since admin is WireGuard/LAN-only, but cheap to add for
 defense in depth (e.g. `gorilla/csrf`).
@@ -40,7 +41,7 @@ client can simply never persist/resend the cookie, so it provides no real
 protection against automated guessing — only against a human retrying in
 the same browser tab, which is already self-limiting.
 
-Implemented instead (`cmd/web/pinlimiter.go`, `cmd/web/handlers_punch.go`):
+Implemented instead (`cmd/punch/pinlimiter.go`, `cmd/punch/handlers.go`):
 an IP-keyed lockout (`pinLimiter`) plus a fixed per-attempt delay applied
 regardless of outcome (`app.pinCheckDelay`). Workers are cellular-only (no
 job-site wifi — see "Reviewed and OK" below), so carrier-grade NAT means an
@@ -54,18 +55,20 @@ attempt. Also added: a per-worker daily punch-in cap (default 3,
 punch records even before a lockout trips.
 
 ### Low: Session cookie security flags not explicit
-`cmd/web/main.go:55-56` — `scs.New()` uses defaults (`HttpOnly` true,
+`cmd/admin/main.go` — `scs.New()` uses defaults (`HttpOnly` true,
 `SameSite=Lax`, but `Secure` false). Fine while everything is plain HTTP;
 revisit (`sessionManager.Cookie.Secure = true`) if either site moves to HTTPS.
 
 ### Low: Both sites run plain HTTP, no TLS
-`cmd/web/main.go:71,76` — `http.ListenAndServe` for both the public worker
-site and the admin site. Admin is covered by WireGuard/LAN isolation. The
+`cmd/punch/main.go` and `cmd/admin/main.go` — `ListenAndServe` for both the
+public worker site and the admin site. Admin is covered by WireGuard/LAN
+isolation, and the punch site is deployed off by default (`deploy/update.sh`
+needs `--with-punch`), which shrinks the exposed window further. The
 public punch site being plain HTTP is worth revisiting if it's ever exposed
 beyond a trusted network path.
 
 ### Low: GPS coordinates unvalidated (audit note, not a real vuln)
-`cmd/web/handlers_punch.go:135-144` (`parseCoords`) — no bounds checking
+`cmd/punch/handlers.go:135-144` (`parseCoords`) — no bounds checking
 (valid range is ±90 lat, ±180 lon), and a client can trivially send fake
 coordinates. Acceptable: GPS here is an anti-fraud/audit signal, not an
 access control.
@@ -85,7 +88,7 @@ attempts — it doesn't protect the PIN at rest.
 - **SQL injection** — all queries use parameterized placeholders (`?`), no
   string concatenation, across all model files.
 - **XSS** — templates use `html/template` (auto-escaping), no
-  `template.HTML` casts of user input found (`cmd/web/templates.go`).
+  `template.HTML` casts of user input found (`cmd/admin/templates.go`).
 - **IP-based buddy-punch detection** — considered and rejected. Workers are
   on cellular only (no job-site wifi), so carrier-grade NAT makes IP useless
   as a signal: many unrelated phones share an IP, and a single phone's IP can

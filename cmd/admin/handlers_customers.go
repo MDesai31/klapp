@@ -27,9 +27,9 @@ func (app *application) adminCustomers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.render(w, r, http.StatusOK, "admin_customers.tmpl", templateData{
-		Customers:     customers,
-		SearchQuery:   q,
-		Flash:         app.sessionManager.PopString(r.Context(), "flash"),
+		Customers:   customers,
+		SearchQuery: q,
+		Flash:       app.sessionManager.PopString(r.Context(), "flash"),
 	})
 }
 

@@ -40,38 +40,36 @@
     if (!form) return;
 
     var button = form.querySelector("button");
-    button.disabled = true;
-    {{if .Spanish}}
-    button.textContent = "Obteniendo ubicación...";
-    {{else}}
-    button.textContent = "Getting location...";
-    {{end}}
 
-    navigator.geolocation.getCurrentPosition(function (pos) {
-        form.lat.value = pos.coords.latitude;
-        form.lon.value = pos.coords.longitude;
-        button.disabled = false;
+    form.addEventListener("submit", function (e) {
+        if (form.dataset.locationDone === "1") return;
+        e.preventDefault();
+
+        button.disabled = true;
         {{if .Spanish}}
-        button.textContent = form.action.endsWith("/out") ? "Registrar Salida" : "Registrar Entrada";
+        button.textContent = "Obteniendo ubicación...";
         {{else}}
-        button.textContent = form.action.endsWith("/out") ? "Punch Out" : "Punch In";
+        button.textContent = "Getting location...";
         {{end}}
-    }, function () {
-        {{if .Worker.RequireLocation}}
-        {{if .Spanish}}
-        button.textContent = "Se requiere ubicación — permite el acceso en tu navegador";
-        {{else}}
-        button.textContent = "Location required — please allow it in your browser";
-        {{end}}
-        {{else}}
-        button.disabled = false;
-        {{if .Spanish}}
-        button.textContent = form.action.endsWith("/out") ? "Registrar Salida" : "Registrar Entrada";
-        {{else}}
-        button.textContent = form.action.endsWith("/out") ? "Punch Out" : "Punch In";
-        {{end}}
-        {{end}}
-    }, { timeout: 15000, maximumAge: 60000 });
+
+        navigator.geolocation.getCurrentPosition(function (pos) {
+            form.lat.value = pos.coords.latitude;
+            form.lon.value = pos.coords.longitude;
+            form.dataset.locationDone = "1";
+            form.submit();
+        }, function () {
+            {{if .Worker.RequireLocation}}
+            {{if .Spanish}}
+            button.textContent = "Se requiere ubicación — permite el acceso en tu navegador";
+            {{else}}
+            button.textContent = "Location required — please allow it in your browser";
+            {{end}}
+            {{else}}
+            form.dataset.locationDone = "1";
+            form.submit();
+            {{end}}
+        }, { timeout: 15000, maximumAge: 60000 });
+    });
 })();
 </script>
 {{end}}

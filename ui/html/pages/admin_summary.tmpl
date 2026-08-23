@@ -4,6 +4,9 @@
 {{template "nav" .}}
 
 <h1>Pay period summary</h1>
+
+{{if .Flash}}<p class="flash">{{.Flash}}</p>{{end}}
+
 <p>Pay period:
 <select onchange="window.location='/admin/summary?period='+this.value">
 {{range .PayPeriods}}<option value="{{.}}"{{if eq . $.CurrentPeriod}} selected{{end}}>{{.}}</option>
@@ -11,15 +14,27 @@
 </select>
 </p>
 
+<form method="POST" action="/admin/summary/print" class="inline">
+<input type="hidden" name="period" value="{{.CurrentPeriod}}">
+<button type="submit">Print schedules</button>
+</form>
+<p class="hint">Sends every active worker's hours for this pay period to the schedule listener on the home server, which builds and prints their sheets.</p>
+
+<form method="POST" action="/admin/summary/punch/bulk">
+<input type="hidden" name="period" value="{{.CurrentPeriod}}">
 <table>
 <tr>
+    <th><input type="checkbox" id="punch-select-all"></th>
     <th>Worker</th>
-    {{range .SummaryDays}}<th>{{.}}</th>{{end}}
+    {{range .SummaryDays}}<th>{{.Label}}</th>{{end}}
     <th>Total</th>
     <th>Salary</th>
 </tr>
 {{range .SummaryRows}}
 <tr>
+    <td>
+    <input type="checkbox" class="punch-check" name="worker_id" value="{{.WorkerID}}">
+    </td>
     <td>{{.WorkerName}}</td>
     {{range .Days}}
     <td>
@@ -32,4 +47,67 @@
 </tr>
 {{end}}
 </table>
+<div class="punch-times">
+    <div>
+    <label for="punch-day">Day</label>
+    <select id="punch-day" name="day">
+    <option value="">Choose a day</option>
+    {{range .SummaryDays}}<option value="{{.Date}}">{{.Label}}</option>
+    {{end}}
+    </select>
+    </div>
+    <div>
+    <label for="time-in">Time in</label>
+    <input type="time" id="time-in" name="time_in">
+    </div>
+    <div>
+    <label for="time-out">Time out</label>
+    <input type="time" id="time-out" name="time_out">
+    </div>
+</div>
+<button type="submit" id="punch-selected" disabled>Punch selected</button>
+<p class="hint">Pick a day of this pay period, then fill in one time, the other, or both: both records a whole shift. Time in adds a punch on that day; time out on its own closes a punch left open that day. These count as admin-entered.</p>
+</form>
+
+<script>
+(function () {
+    var checks = document.querySelectorAll(".punch-check");
+    var selectAll = document.getElementById("punch-select-all");
+    var button = document.getElementById("punch-selected");
+    var day = document.getElementById("punch-day");
+    var timeIn = document.getElementById("time-in");
+    var timeOut = document.getElementById("time-out");
+
+    // Typical days start at 8, so a blank field fills itself in the moment
+    // it's touched; the admin only has to change it when the day was odd,
+    // and an untouched field stays blank and means "don't punch that end".
+    [[timeIn, "08:00"], [timeOut, "17:00"]].forEach(function (pair) {
+        pair[0].addEventListener("focus", function () {
+            if (!pair[0].value) pair[0].value = pair[1];
+        });
+    });
+
+    // Unlike the dashboard, the day is never implied here, so it has to be
+    // chosen before the punch means anything.
+    function updateButton() {
+        var anyChecked = [].some.call(checks, function (c) {
+            return c.checked;
+        });
+        button.disabled = !anyChecked || !day.value;
+    }
+
+    checks.forEach(function (c) {
+        c.addEventListener("change", updateButton);
+    });
+
+    day.addEventListener("change", updateButton);
+
+    selectAll.addEventListener("change", function () {
+        checks.forEach(function (c) {
+            c.checked = selectAll.checked;
+        });
+        updateButton();
+    });
+})();
+</script>
 {{end}}

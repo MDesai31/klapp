@@ -1,0 +1,15 @@
+[Unit]
+Description=Klaus Field Log schedule listener (builds and prints pay-period PDFs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tklaus
+WorkingDirectory=/opt/schedule-listener
+ExecStart=/opt/schedule-listener/schedule-listener -config /opt/schedule-listener/config.json
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run from the project root: ~/klapp
-APP_DIR=/opt/klapp
+# First-time setup: directories, systemd units, Caddy. For routine code
+# pushes use update.sh instead.
+#
+#   ./deploy/deploy.sh               admin + invoice sites only (punch site off)
+#   ./deploy/deploy.sh --with-punch  also enable the public worker punch site
+
+cd "$(dirname "$0")/.."
+source deploy/lib.sh
+
+parse_args "$@"
 
 sudo mkdir -p "$APP_DIR/db"
 sudo chown -R "$(whoami):$(whoami)" "$APP_DIR"
 
-go build -o "$APP_DIR/web" ./cmd/web
-go build -o "$APP_DIR/invoice" ./cmd/invoice
-rsync -a --delete ui/ "$APP_DIR/ui/"
-
-sudo cp deploy/klapp.service /etc/systemd/system/klapp.service
-sudo cp deploy/klapp-invoice.service /etc/systemd/system/klapp-invoice.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now klapp
-sudo systemctl enable --now klapp-invoice
+build_binaries
+install_units
+retire_legacy_unit
+apply_services
 
 if ! command -v caddy >/dev/null; then
 	sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl

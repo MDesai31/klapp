@@ -7,7 +7,7 @@ type: domain
 Worker auth is a bare PIN: `WorkerModel.Authenticate` checks the entered PIN against **every
 active worker** (no name/ID picker), so a failed attempt can't be attributed to a specific
 worker. Brute-force defense is therefore connection-shaped, not account-shaped
-(`cmd/web/pinlimiter.go`): an IP-keyed lockout (default 10 failures/15 min, tunable in
+(`cmd/punch/pinlimiter.go`): an IP-keyed lockout (default 10 failures/15 min, tunable in
 `config.json`), a flat per-attempt delay (default 250ms) applied regardless of outcome, and a
 per-worker daily punch-in cap (default 3).
 

@@ -11,6 +11,7 @@
 /cmd/seedadmin/seedadmin
 /web
 /seedadmin
+/printsched
 
 # secrets
 .env
@@ -18,3 +19,13 @@
 # Next.js-era leftovers (working trees predating the Go rewrite)
 .next/
 node_modules/
+
+# python
+__pycache__/
+*.pyc
+
+# schedule listener (deployed to the home server, see schedule_listener/README.md)
+/schedule_listener/config.json
+/schedule_listener/schedule-listener
+/schedule_listener/out/
+/schedule_listener/*.pdf

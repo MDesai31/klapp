@@ -58,3 +58,10 @@ Future intents — captured by `/project-plan`, not started. Scope before acting
 - Intended start: someday
 - Why/context: carried over from Next.js-era `docs/ideas.md`; workers are cellular-only so dead zones are plausible. The original plan's fallback is "text the admin".
 - To start, future-us needs: decide if the complexity is warranted for a rare case; conflicts with the stateless-PIN design.
+
+### bilingual-voice-estimates — Dictate a site walkthrough, get a priced line-item estimate
+- Workstream: invoicing
+- Priority: someday
+- Intended start: someday
+- Why/context: the crew lead on site often speaks Spanish while the owner and customer read English; estimates today are notepad-then-retype-at-night, and jobs are lost to whoever quotes first. Idea (2026-09-09 brainstorm): crew lead dictates the walkthrough on their phone in Spanish or English; transcribe (Whisper), extract tasks + quantities (LLM), price against the contractor's own rate card, and produce an English line-item estimate with the source transcript kept alongside. Klaus is the first tester. Judged the strongest product idea of the session but parked because contractors are reached by word of mouth, not search — distribution is the hard part, not the tech.
+- To start, future-us needs: a rate-card model (per-unit prices per task) that doesn't exist in the schema yet; the prototype path is Whisper + Ollama on the Legion RTX 4060 over the tailnet at zero API cost, production is a serverless GPU provider + a VPS (never homebox for paying users); a decision on whether this is a klapp feature or its own product with klapp as the first integration.
